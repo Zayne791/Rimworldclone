@@ -139,10 +139,11 @@ export class UI {
     const sun = hour >= 6 && hour < 19 ? '☀' : '☾';
     const waiting = g.net && eff < sp ? w.players.filter(p => p.connected && p.speed < sp).map(p => p.name).join(', ') : '';
     const d1 = `${hh} · ${window.innerWidth < 440 ? w.dateString().replace(/, \d+$/, '') : w.dateString()}`;
-    const d2 = `${sun} ${wd.label} · ${t}°C${waiting ? ` · waiting: ${waiting}` : ''}`;
+    const stalled = !!(g.net && !g.isHost && (g.net as any).hostStalled);
+    const d2 = stalled ? '⏳ waiting for host…' : `${sun} ${wd.label} · ${t}°C${waiting ? ` · waiting: ${waiting}` : ''}`;
     const e1 = this.top.querySelector('.d1')!, e2 = this.top.querySelector('.d2')!;
     if (e1.textContent !== d1) e1.textContent = d1;
-    if (e2.textContent !== d2) { e2.textContent = d2; (e2 as HTMLElement).classList.toggle('warn', !!waiting); }
+    if (e2.textContent !== d2) { e2.textContent = d2; (e2 as HTMLElement).classList.toggle('warn', !!waiting || stalled); }
     this.top.querySelectorAll('.speed .btn').forEach(b => {
       const v = +(b as HTMLElement).dataset.v!;
       b.classList.toggle('on', v === sp);

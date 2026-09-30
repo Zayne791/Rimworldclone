@@ -325,7 +325,11 @@ export class ClientSession implements Session {
     });
   }
 
+  /** performance.now() of the last message from the host (a backgrounded host iPad stops sending) */
+  lastMsgAt = performance.now();
+  get hostStalled() { return !!this.conn && performance.now() - this.lastMsgAt > 3000; }
   onMsg(s: string) {
+    this.lastMsgAt = performance.now();
     const m = JSON.parse(s);
     if (m.t === 'delta') this.apply(m);
     else if (m.t === 'res') { const cb = this.pending.get(m.id); if (cb) { this.pending.delete(m.id); cb({ ok: m.ok, msg: m.msg }); } }
