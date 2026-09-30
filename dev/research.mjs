@@ -15,6 +15,7 @@ await p.waitForSelector('[data-m="go"]'); await p.tap('[data-m="go"]');
 await p.waitForTimeout(1200);
 await p.tap('#tab-research'); await p.waitForTimeout(400);
 await p.tap('[data-v="ship_reactor"]'); await p.waitForTimeout(400);
+if (process.env.GAMESHOT) { await p.tap('[data-a="closemodal"]'); await p.waitForTimeout(300); }
 await p.screenshot({ path: `${pre}-tree.png` });
 console.log(errs.join('\n') || 'no errors');
 await b.close();

@@ -116,6 +116,25 @@ You can also point at your own PeerJS server with `VITE_PEER_HOST`, `VITE_PEER_P
 - **Research tree**, **trading** (caravans and orbital traders), **save/load** (auto-save in the browser,
   export/import to file).
 
+## Testing
+
+Headless simulation tests run in Node with `npx tsx`:
+
+| script | checks |
+| --- | --- |
+| `tests/simtest.ts [days] [size] [seed]` | long soak with a scripted "player" (builds, hunts, drafts during raids); prints colony state every half day |
+| `tests/combat.ts [points] [trials]` | raid balance: win rate of three starting colonists vs raids of N points |
+| `tests/hunt.ts` | hunt → haul → butcher → cook pipeline |
+| `tests/saveload.ts` | save/load round trip mid-game, then keeps simulating |
+| `tests/pathstat.ts`, `tests/pathfail.ts` | pathfinding load and failure sources |
+
+Browser checks use Playwright against `npm run dev` (they expect the dev server on port 5173; the
+multiplayer ones also need a local PeerJS server, `npx peerjs --port 9000 --path /`, or the relay):
+`dev/ui.mjs` walks through every screen on an emulated iPad/iPhone, `dev/mp.mjs` plays a
+two-device multiplayer session including reconnect, `dev/mp-soak.mjs` diffs host and client
+worlds after a long run, `dev/perf.mjs` measures frame rate, and `dev/raid.mjs` exercises the
+raid/draft flow.
+
 ## Code map
 
 ```

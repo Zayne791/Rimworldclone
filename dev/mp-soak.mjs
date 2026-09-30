@@ -1,0 +1,53 @@
+// Two-player replication soak: run at high speed, pause, then diff host vs client world state.
+import { chromium, devices } from 'playwright';
+const Q = process.argv[2] || 'peerhost=127.0.0.1&peerport=9000&peerpath=/&peersecure=false';
+const secs = +(process.argv[3] || 60);
+const base = 'http://127.0.0.1:5173/?' + Q;
+const b = await chromium.launch({ args: ['--disable-features=WebRtcHideLocalIpsWithMdns'] });
+const errs = [];
+const mk = async (dev, tag) => { const c = await b.newContext({ ...devices[dev] }); const p = await c.newPage(); p.on('pageerror', e => errs.push(tag + ' pageerror: ' + e.message + ' ' + e.stack)); p.on('console', m => { if (m.type() === 'error') errs.push(tag + ' console: ' + m.text()); }); return p; };
+const A = await mk('iPad Pro 11', 'A');
+await A.goto(base);
+await A.waitForSelector('[data-m="host"]'); await A.tap('[data-m="host"]');
+await A.waitForSelector('[data-m="next"]'); await A.tap('[data-m="next"]');
+await A.waitForSelector('[data-m="site"]', { timeout: 30000 }); await A.tap('[data-m="site"]');
+await A.waitForSelector('[data-m="go"]'); await A.tap('[data-m="go"]');
+await A.waitForFunction(() => window.__game?.net?.roomCode, null, { timeout: 30000 });
+const code = await A.evaluate(() => window.__game.net.roomCode);
+const B = await mk('iPad Pro 11', 'B');
+await B.goto(base + '&join=' + code);
+await B.waitForSelector('[data-m="go"]'); await B.tap('[data-m="go"]');
+await B.waitForSelector('[data-m="site"]', { timeout: 40000 }); await B.tap('[data-m="site"]');
+await B.waitForSelector('[data-m="go"]'); await B.tap('[data-m="go"]');
+await B.waitForFunction(() => window.__game && window.__game.world.colonists(window.__game.faction).length > 0, null, { timeout: 30000 });
+// both players give orders so there is construction, zones and hauling going on
+for (const P of [A, B]) await P.evaluate(() => {
+  const g = window.__game, w = g.world, m = w.map, p = w.colonists(g.faction)[0];
+  const cells = []; for (let y = p.y + 3; y < p.y + 7; y++) for (let x = p.x - 3; x < p.x + 3; x++) if (m.inb(x, y)) cells.push(m.idx(x, y));
+  g.cmd({ c: 'zone', op: 'new', kind: 'stockpile', cells });
+  const wall = []; for (let x = p.x - 4; x < p.x + 4; x++) wall.push([x, p.y - 4]);
+  g.cmd({ c: 'build', def: 'wall', stuff: 'wood', rot: 0, cells: wall });
+  g.cmd({ c: 'build', def: 'campfire', rot: 0, cells: [[p.x + 5, p.y]] });
+  const trees = []; for (let y = p.y - 15; y < p.y + 15; y++) for (let x = p.x - 15; x < p.x + 15; x++) if (m.inb(x, y) && m.plantDef(m.idx(x, y))?.kind === 'tree') trees.push(m.idx(x, y));
+  g.cmd({ c: 'designate', kind: 'chop', cells: trees.slice(0, 12) });
+});
+await A.evaluate(() => window.__game.setSpeed(4)); await B.evaluate(() => window.__game.setSpeed(4));
+await A.waitForTimeout(secs * 1000);
+await A.evaluate(() => window.__game.setSpeed(0)); await B.evaluate(() => window.__game.setSpeed(0));
+await A.waitForTimeout(2500);
+const snap = () => {
+  const w = window.__game.world, m = w.map;
+  const pawns = {}; for (const p of w.pawns.values()) pawns[p.id] = [p.race, p.x, p.y, p.dead ? 1 : 0, p.downed ? 1 : 0, p.job?.type || '', p.hediffs.length, p.faction];
+  const items = {}; for (const it of w.items.values()) items[it.id] = [it.def, it.x, it.y, it.count];
+  const blds = {}; for (const bl of w.buildings.values()) blds[bl.id] = [bl.def, bl.x, bl.y, Math.round(bl.hp)];
+  const bps = {}; for (const bp of w.blueprints.values()) bps[bp.id] = [bp.def, bp.x, bp.y, JSON.stringify(bp.delivered)];
+  let tiles = 0; for (let i = 0; i < m.n; i++) tiles = (tiles * 31 + m.plant[i] * 7 + m.rock[i] * 13 + m.floor[i] * 17 + m.zone[i] * 19 + m.desig[i] * 23 + m.roof[i] * 29) >>> 0;
+  return { tick: w.tick, pawns, items, blds, bps, zones: [...w.zones.values()].map(z => z.id + ':' + z.cells.length).sort(), tiles, letters: w.letters.length, day: w.day };
+};
+const [sa, sb] = [await A.evaluate(snap), await B.evaluate(snap)];
+const diff = (name, x, y) => { const ks = new Set([...Object.keys(x), ...Object.keys(y)]); const bad = []; for (const k of ks) if (JSON.stringify(x[k]) !== JSON.stringify(y[k])) bad.push(`${k}: host ${JSON.stringify(x[k])} client ${JSON.stringify(y[k])}`); console.log(`${name}: ${Object.keys(x).length} host / ${Object.keys(y).length} client, mismatches ${bad.length}`); for (const l of bad.slice(0, 6)) console.log('   ', l); };
+console.log('tick host', sa.tick, 'client', sb.tick, 'day', sa.day, 'letters', sa.letters, sb.letters);
+diff('pawns', sa.pawns, sb.pawns); diff('items', sa.items, sb.items); diff('buildings', sa.blds, sb.blds); diff('blueprints', sa.bps, sb.bps);
+console.log('zones equal', JSON.stringify(sa.zones) === JSON.stringify(sb.zones), 'tiles equal', sa.tiles === sb.tiles);
+console.log(errs.slice(0, 10).join('\n') || 'no errors');
+await b.close();
