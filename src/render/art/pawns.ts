@@ -1,151 +1,11 @@
 // Procedural pixel-art characters: colonists (4 facings, walk cycle), animals and mechanoids.
-import { Pix, C, ramp, mix, addSprite, h2, type Sprite, type RGBA } from '../pixel';
+import { Pix, C, ramp, mix, addSprite, h2, type Sprite } from '../pixel';
 import type { Pawn } from '../../sim/types';
-import { ITEMS } from '../../data/items';
 import { ANIMALS } from '../../data/animals';
+import { lookOf, lookKey, personPix, portraitBust, PERSON_W, PERSON_H, type Expr } from './people';
 
-export const PAWN_W = 16, PAWN_H = 24;
-
-interface Look { skin: RGBA; hair: RGBA; hairStyle: string; beard: boolean; body: number; torso: RGBA | null; legs: RGBA | null; coat: RGBA | null; coatLong: boolean; head: string | null; headCol: RGBA | null; armor: boolean; female: boolean }
-
-export function lookOf(p: Pawn): Look {
-  let torso: RGBA | null = null, legs: RGBA | null = null, coat: RGBA | null = null, coatLong = false, head: string | null = null, headCol: RGBA | null = null, armor = false;
-  const order = ['skin', 'middle', 'outer'];
-  const sorted = [...p.apparel].sort((a, b) => {
-    const la = Math.max(...ITEMS[a.def].apparel!.layers.map(l => order.indexOf(l)));
-    const lb = Math.max(...ITEMS[b.def].apparel!.layers.map(l => order.indexOf(l)));
-    return la - lb;
-  });
-  for (const a of sorted) {
-    const d = ITEMS[a.def].apparel!;
-    const col = C(a.color || (a.stuff ? ITEMS[a.stuff]?.stuff?.color || '#888' : d.color || '#7a8a9a'));
-    const tcol = a.def === 'shirt' || a.def === 'tshirt' ? C(a.color || p.look.color || '#5a6a8c') : col;
-    if (d.layers.includes('head')) { head = d.style; headCol = col; continue; }
-    if (d.style === 'armor') armor = true;
-    if (d.layers.includes('outer')) { coat = col; coatLong = d.cover.includes('legs'); if (d.style === 'armor') { torso = col; legs = ramp(col, 0.85); } continue; }
-    if (d.cover.includes('torso')) torso = d.style === 'vest' && torso ? torso : tcol;
-    if (d.style === 'vest') coat = col;
-    if (d.cover.includes('legs')) legs = d.style === 'tribal' ? col : col;
-  }
-  return {
-    skin: C(p.look.skin), hair: C(p.look.hairColor), hairStyle: p.look.hair, beard: !!p.look.beard, body: p.look.body ?? 1,
-    torso, legs, coat, coatLong, head, headCol, armor, female: p.gender === 'f',
-  };
-}
-
-function hairFront(p: Pix, L: Look, x0: number, y0: number, back: boolean) {
-  const h = L.hair, hd = ramp(h, 0.72), hl = ramp(h, 1.25);
-  const s = L.hairStyle;
-  const cap = (rows: number) => { for (let y = 0; y < rows; y++) p.hline(x0 + (y === 0 ? 1 : 0), x0 + 7 - (y === 0 ? 1 : 0), y0 + y, y === 0 ? hl : h); };
-  if (s === 'bald') { if (back) p.hline(x0 + 1, x0 + 6, y0 + 1, ramp(L.skin, 0.9)); return; }
-  if (s === 'buzz') { p.hline(x0 + 1, x0 + 6, y0, hd); p.hline(x0, x0 + 7, y0 + 1, h); if (back) p.rect(x0, y0, 8, 4, h); return; }
-  if (s === 'mohawk') { p.rect(x0 + 3, y0 - 2, 2, 4, h); p.set(x0 + 3, y0 - 2, hl); if (back) p.rect(x0 + 3, y0, 2, 6, h); return; }
-  if (s === 'curly') { for (let y = -1; y < 3; y++) for (let x = -1; x < 9; x++) if ((x + y) % 2 === 0 || y < 2) p.set(x0 + x, y0 + y, (x * 3 + y) % 4 === 0 ? hl : h); p.set(x0 - 1, y0 + 3, h); p.set(x0 + 8, y0 + 3, h); if (back) p.rect(x0 - 1, y0, 10, 6, h); return; }
-  if (s === 'spiky') { cap(2); for (let x = 0; x < 8; x += 2) { p.set(x0 + x, y0 - 1, h); p.set(x0 + x + 1, y0 - 2, hl); } if (back) p.rect(x0, y0, 8, 5, h); return; }
-  cap(2);
-  p.vline(x0, y0, y0 + 3, h); p.vline(x0 + 7, y0, y0 + 3, h);
-  if (s === 'long') { p.vline(x0 - 1, y0 + 2, y0 + 9, hd); p.vline(x0, y0 + 4, y0 + 8, h); p.vline(x0 + 8, y0 + 2, y0 + 9, hd); p.vline(x0 + 7, y0 + 4, y0 + 8, h); }
-  if (s === 'bob') { p.vline(x0 - 1, y0 + 1, y0 + 6, hd); p.vline(x0 + 8, y0 + 1, y0 + 6, hd); p.vline(x0, y0 + 4, y0 + 6, h); p.vline(x0 + 7, y0 + 4, y0 + 6, h); }
-  if (s === 'bun') { p.blob(x0 + 3.5, y0 - 1.5, 2.2, 1.8, h); }
-  if (s === 'ponytail' && back) { p.vline(x0 + 3, y0 + 6, y0 + 10, h); p.vline(x0 + 4, y0 + 6, y0 + 9, hd); }
-  if (back) { p.rect(x0, y0, 8, s === 'long' ? 9 : s === 'bob' ? 7 : 5, h); for (let y = 1; y < 5; y++) p.set(x0 + 2 + (y % 3), y0 + y, hd); }
-}
-
-function headgear(p: Pix, L: Look, x0: number, y0: number, side: boolean) {
-  if (!L.head || !L.headCol) return;
-  const c = L.headCol, d = ramp(c, 0.72), l = ramp(c, 1.25);
-  switch (L.head) {
-    case 'helmet': p.rect(x0 - 1, y0 - 1, 10, 4, c); p.hline(x0, x0 + 7, y0 - 2, l); p.hline(x0 - 1, x0 + 8, y0 + 2, d); break;
-    case 'marinehelmet': p.rect(x0 - 1, y0 - 2, 10, 9, c); p.hline(x0, x0 + 7, y0 - 3, l); if (!side) { p.rect(x0 + 1, y0 + 2, 6, 2, C('#1e2a38')); p.hline(x0 + 1, x0 + 6, y0 + 2, C('#6fb0f0')); } else { p.rect(x0 + 4, y0 + 2, 4, 2, C('#1e2a38')); p.set(x0 + 7, y0 + 2, C('#6fb0f0')); } p.hline(x0 - 1, x0 + 8, y0 + 6, d); break;
-    case 'cowboyhat': p.hline(x0 - 3, x0 + 10, y0 + 1, d); p.hline(x0 - 2, x0 + 9, y0 + 1, c); p.rect(x0 + 1, y0 - 3, 6, 4, c); p.hline(x0 + 1, x0 + 6, y0 - 3, l); p.hline(x0 + 1, x0 + 6, y0, C('#3a2a1a')); break;
-    case 'tuque': p.rect(x0, y0 - 2, 8, 4, c); p.hline(x0 - 1, x0 + 8, y0 + 1, d); p.hline(x0, x0 + 7, y0 - 2, l); p.blob(x0 + 3.5, y0 - 3, 1.5, 1.3, C('#f0f0f0')); break;
-  }
-}
-
-/** facing: 0 S, 1 E, 2 N ; frame 0/1 */
-export function humanPix(L: Look, facing: number, frame: number, drafted = false): Pix {
-  const p = new Pix(PAWN_W, PAWN_H);
-  const bob = frame === 1 ? 1 : 0;
-  const skin = L.skin, sd = ramp(skin, 0.78);
-  const torso = L.torso || skin;
-  const legs = L.legs || ramp(skin, 0.9);
-  const shoe = C('#3a2c24');
-  const bw = L.armor ? 10 : [6, 8, 10][L.body] ?? 8;
-  const tx0 = 8 - bw / 2;
-  const headY = 4 + bob, torsoY = 11 + bob;
-  // shadow
-  p.ellipse(8, 22.5, 5, 1.5, [20, 16, 30, 70]);
-  if (facing === 1) {
-    // side view (facing right)
-    const lf = frame === 0 ? 0 : 1;
-    // back leg, front leg
-    p.rect(6 - lf, 17 + bob, 2, 5 - bob, ramp(legs, 0.8)); p.set(6 - lf, 21, ramp(shoe, 0.8)); p.set(7 - lf, 21, ramp(shoe, 0.8));
-    p.rect(8 + lf, 17 + bob, 2, 5 - bob, legs); p.hline(8 + lf, 10 + lf, 21, shoe);
-    // torso
-    p.rect(5, torsoY, 6, 6, torso); p.hline(5, 10, torsoY, ramp(torso, 1.15)); p.vline(10, torsoY, torsoY + 5, ramp(torso, 0.82));
-    if (L.coat) { p.rect(5, torsoY, 6, L.coatLong ? 9 - bob : 6, L.coat); p.vline(10, torsoY, torsoY + (L.coatLong ? 8 : 5), ramp(L.coat, 0.8)); }
-    // arm
-    const ax = drafted ? 9 : 7 + (frame ? 1 : -1);
-    p.rect(ax, torsoY + 1, 2, 4, ramp(L.coat || torso, 0.9)); p.set(ax + (drafted ? 1 : 0), torsoY + 5, sd);
-    // head
-    p.rect(5, headY, 7, 7, skin); p.hline(5, 11, headY + 6, sd); p.vline(11, headY + 1, headY + 5, ramp(skin, 0.92));
-    p.set(12, headY + 3, skin); // nose
-    p.set(10, headY + 3, C('#1e1a24')); // eye
-    if (L.beard) { p.rect(8, headY + 5, 4, 2, L.hair); }
-    // hair (side)
-    if (L.hairStyle !== 'bald') {
-      const h = L.hair;
-      const s = L.hairStyle;
-      p.rect(5, headY - 1, 7, 2, h); p.rect(5, headY, 3, s === 'long' ? 8 : s === 'bob' ? 6 : 4, h);
-      if (s === 'mohawk') { p.rect(6, headY - 3, 4, 2, h); p.clear(11, headY - 1); }
-      if (s === 'buzz') { p.clear(11, headY - 1); p.rect(5, headY, 2, 3, h); }
-      if (s === 'ponytail') { p.vline(4, headY + 2, headY + 7, h); }
-      if (s === 'bun') p.blob(5.5, headY - 1, 2, 1.8, h);
-      if (s === 'curly') { p.rect(4, headY - 2, 8, 3, h); p.rect(4, headY, 3, 5, h); }
-      p.hline(6, 10, headY - 1, ramp(h, 1.25));
-    }
-    headgear(p, L, 5, headY, true);
-  } else {
-    const back = facing === 2;
-    // legs
-    const l1 = frame === 1 ? 1 : 0, l2 = frame === 1 ? 0 : 0;
-    p.rect(tx0 + 1, 17 + bob, 2, 5 - bob - l1, legs); p.rect(tx0 + bw - 3, 17 + bob, 2, 5 - bob - l2, ramp(legs, 0.9));
-    p.hline(tx0 + 1, tx0 + 2, 21 - l1, shoe); p.hline(tx0 + bw - 3, tx0 + bw - 2, 21, shoe);
-    // torso + arms
-    p.rect(tx0, torsoY, bw, 6, torso);
-    p.hline(tx0, tx0 + bw - 1, torsoY, ramp(torso, 1.15));
-    p.hline(tx0, tx0 + bw - 1, torsoY + 5, ramp(torso, 0.8));
-    if (L.coat) { p.rect(tx0, torsoY, bw, L.coatLong ? 9 - bob : 6, L.coat); p.hline(tx0, tx0 + bw - 1, torsoY, ramp(L.coat, 1.15)); if (!back) p.vline(8, torsoY + 1, torsoY + (L.coatLong ? 8 : 5), ramp(L.coat, 0.75)); }
-    if (!back && L.torso && !L.coat) { p.set(7, torsoY, ramp(torso, 0.7)); p.set(8, torsoY, ramp(torso, 0.7)); }
-    const armC = ramp(L.coat || torso, 0.88);
-    p.rect(tx0 - 1, torsoY + 1 + (frame ? 1 : 0), 1, 4, armC); p.rect(tx0 + bw, torsoY + 1 + (frame ? 0 : 1), 1, 4, armC);
-    p.set(tx0 - 1, torsoY + 5 + (frame ? 1 : 0), sd); p.set(tx0 + bw, torsoY + 5 + (frame ? 0 : 1), sd);
-    // belt
-    if (!L.coatLong) p.hline(tx0, tx0 + bw - 1, torsoY + 6, ramp(legs, 0.7));
-    // head
-    const hx = 4;
-    p.rect(hx, headY, 8, 7, skin);
-    p.hline(hx, hx + 7, headY + 6, sd); p.vline(hx + 7, headY + 1, headY + 5, ramp(skin, 0.9));
-    p.clear(hx, headY); p.clear(hx + 7, headY); p.clear(hx, headY + 6); p.clear(hx + 7, headY + 6);
-    if (!back) {
-      p.set(hx + 2, headY + 3, C('#1e1a24')); p.set(hx + 5, headY + 3, C('#1e1a24'));
-      p.set(hx + 2, headY + 2, ramp(L.hair, 0.8)); p.set(hx + 5, headY + 2, ramp(L.hair, 0.8));
-      if (L.beard) { p.rect(hx + 1, headY + 5, 6, 2, L.hair); p.set(hx + 3, headY + 5, ramp(skin, 0.8)); p.set(hx + 4, headY + 5, ramp(skin, 0.8)); }
-      else p.set(hx + 3, headY + 5, ramp(skin, 0.7));
-    }
-    hairFront(p, L, hx, headY - 1, back);
-    headgear(p, L, hx, headY, false);
-  }
-  p.outline(undefined, false, true);
-  return p;
-}
-
-export function portraitPix(L: Look): Pix {
-  const src = humanPix(L, 0, 0);
-  const p = new Pix(16, 16);
-  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const c = src.get(x, y + 1); if (c) p.set(x, y, c); }
-  return p;
-}
+export const PAWN_W = PERSON_W, PAWN_H = PERSON_H;
+export { lookOf };
 
 // ---------------- animals ----------------
 interface Quad { w: number; h: number; len: number; ht: number; leg: number; head: number; neck: number; tail: string; ears: string; horns: string; wool?: boolean; sac?: boolean; spots?: boolean; snout: number }
@@ -272,25 +132,22 @@ function mechPix(race: string, frame: number): Pix {
 
 // ---------------- caches ----------------
 const cache = new Map<string, Sprite>();
-function lookKey(L: Look) {
-  const c = (x: RGBA | null) => (x ? x.join(',') : '-');
-  return `${c(L.skin)}|${c(L.hair)}|${L.hairStyle}|${L.beard ? 1 : 0}|${L.body}|${c(L.torso)}|${c(L.legs)}|${c(L.coat)}|${L.coatLong ? 1 : 0}|${L.head}|${c(L.headCol)}|${L.armor ? 1 : 0}`;
-}
 
+/** frame: 0 standing, 1..3 walk cycle (animals use 0/1) */
 export function pawnSprite(p: Pawn, facing: number, frame: number, drafted = false): { s: Sprite; flip: boolean } {
   if (p.race === 'human') {
     const L = lookOf(p);
     const f = facing === 3 ? 1 : facing;
     const key = 'h' + lookKey(L) + ':' + f + ':' + frame + (drafted ? 'd' : '');
     let s = cache.get(key);
-    if (!s) { s = addSprite(humanPix(L, f, frame, drafted), 0, 16 - PAWN_H); cache.set(key, s); }
+    if (!s) { s = addSprite(personPix(L, f, frame, drafted), -2, 14 - 25); cache.set(key, s); }
     return { s, flip: facing === 3 };
   }
   const a = ANIMALS[p.race];
-  const key = 'a' + p.race + ':' + frame;
+  const key = 'a' + p.race + ':' + (frame & 1);
   let s = cache.get(key);
   if (!s) {
-    const px = a?.mech ? mechPix(p.race, frame) : p.race === 'chicken' ? chickenPix(frame) : quadPix(p.race, frame);
+    const px = a?.mech ? mechPix(p.race, frame & 1) : p.race === 'chicken' ? chickenPix(frame & 1) : quadPix(p.race, frame & 1);
     s = addSprite(px, Math.round((16 - px.w) / 2), 16 - px.h + 1);
     cache.set(key, s);
   }
@@ -304,7 +161,7 @@ export function lyingSprite(p: Pawn, dead: boolean): Sprite {
   const key = 'l' + (p.race === 'human' ? lookKey(lookOf(p)) : p.race) + (dead ? 'd' : '');
   let s = cache.get(key);
   if (s) return s;
-  let px = p.race === 'human' ? humanPix(lookOf(p), 0, 0) : ANIMALS[p.race]?.mech ? mechPix(p.race, 0) : p.race === 'chicken' ? chickenPix(0) : quadPix(p.race, 0);
+  let px = p.race === 'human' ? personPix(lookOf(p), 0, 0) : ANIMALS[p.race]?.mech ? mechPix(p.race, 0) : p.race === 'chicken' ? chickenPix(0) : quadPix(p.race, 0);
   // drop shadow row removal
   px.map((c) => (c[3] < 120 ? null : c));
   px = p.race === 'human' ? px.rot90(1) : px.rot90(0);
@@ -315,15 +172,27 @@ export function lyingSprite(p: Pawn, dead: boolean): Sprite {
   return s;
 }
 
+/** the face shown in the colonist bar and inspector reacts to how the colonist is doing */
+export function expressionOf(p: Pawn): Expr {
+  if (p.dead) return 'hurt';
+  if (p.downed) return 'hurt';
+  if (p.mental) return p.mental.kind === 'berserk' || p.mental.kind === 'tantrum' ? 'angry' : 'sad';
+  const m = p.needs?.mood ?? 0.5;
+  return m > 0.66 ? 'happy' : m < 0.32 ? 'sad' : 'neutral';
+}
+
 export function portraitSprite(p: Pawn): Sprite {
-  const key = 'p' + (p.race === 'human' ? lookKey(lookOf(p)) : p.race);
+  const expr = p.race === 'human' ? expressionOf(p) : 'neutral';
+  const key = 'p' + (p.race === 'human' ? lookKey(lookOf(p)) + expr : p.race);
   let s = cache.get(key);
   if (s) return s;
   let px: Pix;
-  if (p.race === 'human') px = portraitPix(lookOf(p));
+  if (p.race === 'human') px = portraitBust(lookOf(p), expr);
   else {
+    // animals: centre the standing sprite on a 32x32 canvas
     const src = ANIMALS[p.race]?.mech ? mechPix(p.race, 0) : p.race === 'chicken' ? chickenPix(0) : quadPix(p.race, 0);
-    px = src;
+    px = new Pix(Math.max(32, src.w), Math.max(32, src.h));
+    px.blit(src, Math.floor((px.w - src.w) / 2), Math.floor((px.h - src.h) / 2));
   }
   s = addSprite(px);
   cache.set(key, s);

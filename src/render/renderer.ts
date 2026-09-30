@@ -6,6 +6,7 @@ import { plantSprite, isFlatPlant } from './art/plants';
 import { itemSprite, heldWeaponSprite } from './art/items';
 import { buildingSprite, wallSprite, doorSprite, turretTopSprite, bladesSprite, stuffColor } from './art/buildings';
 import { pawnSprite, lyingSprite } from './art/pawns';
+const WALK = [1, 2, 3, 2];
 import { Pix, C, addSprite, type Sprite, h2 } from './pixel';
 import { BUILDINGS } from '../data/buildings';
 import { ITEMS } from '../data/items';
@@ -455,7 +456,7 @@ export class Renderer {
   drawPawn(ctx: CanvasRenderingContext2D, p: Pawn, px: number, py: number) {
     const w = this.w;
     const moving = p.mp > 0 || (p.path && p.path.length > 0 && p.pi < p.path.length);
-    const frame = moving ? Math.floor(this.time * 7 + p.id) % 2 : 0;
+    const frame = moving ? (p.race === 'human' ? WALK[Math.floor(this.time * 9 + p.id) % 4] : Math.floor(this.time * 7 + p.id) % 2) : 0;
     const inBed = !!(p.asleep && p.job && (p.job.type === 'sleep' || p.job.type === 'rest') && p.job.t);
     if (p.downed || inBed) {
       const s = lyingSprite(p, false);
@@ -473,7 +474,7 @@ export class Renderer {
       if (p.race === 'human' && p.equip && (p.drafted || p.job?.type === 'attack' || p.job?.type === 'wait' && p.lord)) {
         const a = aimAngle ?? (face === 1 ? 0 : face === 3 ? Math.PI : face === 0 ? Math.PI / 2 : -Math.PI / 2);
         const { s: ws, flip: wf } = heldWeaponSprite(p.equip.def, p.equip.stuff, a);
-        const hx = px + 8 + Math.cos(a) * 3, hy = py + 3 + Math.sin(a) * 2;
+        const hx = px + 8 + Math.cos(a) * 3, hy = py + 5 + Math.sin(a) * 2;
         if (face === 2) { /* behind body: skip drawing over */ }
         ctx.save();
         ctx.translate(hx, hy);
@@ -483,12 +484,13 @@ export class Renderer {
       }
       if (p.carry) {
         const cs = p.carry.corpse ? lyingSprite(p.carry.corpse, true) : itemSprite(p.carry.def, p.carry.stuff, p.carry.color);
-        ctx.drawImage(cs.img, cs.sx, cs.sy, cs.w, cs.h, px + 3, py - 1, cs.w * 0.65, cs.h * 0.65);
+        ctx.drawImage(cs.img, cs.sx, cs.sy, cs.w, cs.h, px + 3, py + 1, cs.w * 0.65, cs.h * 0.65);
       }
     }
     // status icons
-    if (p.mental) { ctx.fillStyle = p.mental.kind === 'berserk' ? '#ff3030' : '#ffb030'; ctx.fillRect(px + 7, py - 12, 2, 4); ctx.fillRect(px + 7, py - 7, 2, 2); }
-    if (p.bubble && p.bubble.t > w.tick) this.drawBubble(ctx, px + 10, py - 14, p.bubble.icon);
+    const top = p.race === 'human' ? py - 3 : py;
+    if (p.mental) { ctx.fillStyle = p.mental.kind === 'berserk' ? '#ff3030' : '#ffb030'; ctx.fillRect(px + 7, top - 12, 2, 4); ctx.fillRect(px + 7, top - 7, 2, 2); }
+    if (p.bubble && p.bubble.t > w.tick) this.drawBubble(ctx, px + 11, top - 14, p.bubble.icon);
     if (p.desig && p.race !== 'human') this.drawMiniIcon(ctx, p.desig, px + 4, py - 10);
     if (p.drafted) { ctx.fillStyle = '#e05040'; ctx.fillRect(px + 3, py + 16, 10, 1); }
     if (p.guest?.prisoner) { ctx.fillStyle = '#f0a030'; ctx.fillRect(px + 3, py + 16, 10, 1); }
