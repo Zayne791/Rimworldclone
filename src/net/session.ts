@@ -76,8 +76,10 @@ export class HostSession implements Session {
   }
 
   async open() {
-    this.transport = await openHost(c => this.onConn(c));
+    // re-hosting a save reuses its room code, so friends' invite links and reclaim tokens keep working
+    this.transport = await openHost(c => this.onConn(c), this.w.settings.roomCode);
     this.roomCode = this.transport.code;
+    this.w.settings.roomCode = this.roomCode;
     this.status = 'Room open';
     // baseline so first delta isn't the whole world
     this.primeBaseline();
@@ -279,6 +281,7 @@ export class ClientSession implements Session {
   private pingT = 0;
   private rtt = 0;
   private lostAt = 0;
+  onLost?: () => void;
 
   async connect(code: string, name: string, colony: string, status: (s: string) => void): Promise<World> {
     this.roomCode = code;
@@ -309,7 +312,7 @@ export class ClientSession implements Session {
       this.conn!.onClose = () => { clearTimeout(to); rej(new Error('Connection closed')); };
       this.conn!.send(JSON.stringify({ t: 'hello', name, colony, token, v: VERSION }));
     }).then(w => {
-      this.conn!.onClose = () => { this.status = 'Disconnected from host'; this.lostAt = performance.now(); this.game?.ui?.toast('Disconnected from host', 'bad'); };
+      this.conn!.onClose = () => { this.status = 'Disconnected from host'; this.lostAt = performance.now(); this.conn = null; this.game?.ui?.toast('Disconnected from host', 'bad'); this.onLost?.(); };
       return w;
     });
   }

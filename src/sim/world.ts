@@ -35,7 +35,7 @@ export interface PlayerInfo {
 
 export interface ResearchState { cur: string | null; prog: Record<string, number>; done: string[] }
 export interface StoryState { nextBig: number; nextSmall: number; nextGood: number; lastRaid: number; cycle: number; threatsSurvived: number; wealth: number; raidsPending: number }
-export interface Settings { storyteller: 'classic' | 'chill' | 'chaos'; difficulty: number; mapSize: number; seed: string; pvp: boolean; maxPlayers: number; permadeath?: boolean }
+export interface Settings { storyteller: 'classic' | 'chill' | 'chaos'; difficulty: number; mapSize: number; seed: string; pvp: boolean; maxPlayers: number; permadeath?: boolean; roomCode?: string }
 export interface Weather { cur: string; next: string; t: number; blend: number; windSpeed: number }
 export interface GameCondition { id: string; until: number; faction?: number }
 

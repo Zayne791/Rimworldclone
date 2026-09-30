@@ -5,6 +5,9 @@ import { applyCommand } from '../src/sim/commands';
 import { jobLabel } from '../src/sim/jobs';
 import { TICKS_PER_DAY } from '../src/core/constants';
 import { ITEMS } from '../src/data/items';
+import { RESEARCH } from '../src/data/recipes';
+import { canStartResearch } from '../src/sim/research';
+import { pawnHostileTo } from '../src/sim/combat';
 
 const days = +(process.argv[2] || 6);
 const size = +(process.argv[3] || 120);
@@ -24,7 +27,8 @@ function open(x0: number, y0: number, w0: number, h0: number) { for (let y = y0;
 log(applyCommand(w, F, { c: 'zone', op: 'new', kind: 'stockpile', cells: cells(cx - 3, cy + 4, cx + 3, cy + 8) }), 'stockpile');
 { let gx = cx + 6, gy = cy - 4; for (let k = 0; k < 40 && !open(gx, gy, 7, 7); k++) { gx = cx + ((k * 7) % 30) - 15; gy = cy + Math.floor(k / 4) * 3 - 15; } log(applyCommand(w, F, { c: 'zone', op: 'new', kind: 'grow', plant: 'potato', cells: cells(gx, gy, gx + 6, gy + 6) }), 'grow'); }
 // room with walls
-const rx = cx - 12, ry = cy - 6, rw = 8, rh = 7;
+let rx = cx - 12, ry = cy - 6; const rw = 8, rh = 7;
+for (let k = 0; k < 60 && !open(rx, ry, rw, rh); k++) { rx = cx - 20 + (k % 8) * 5; ry = cy - 20 + Math.floor(k / 8) * 5; }
 const wallCells: [number, number][] = [];
 for (let x = rx; x < rx + rw; x++) { wallCells.push([x, ry]); wallCells.push([x, ry + rh - 1]); }
 for (let y = ry + 1; y < ry + rh - 1; y++) { wallCells.push([rx, y]); wallCells.push([rx + rw - 1, y]); }
@@ -42,13 +46,36 @@ log(applyCommand(w, F, { c: 'designate', kind: 'chop', cells: treeCells }), 'cho
 const rockCells = cells(cx - 30, cy - 30, cx + 30, cy + 30).filter(i => m.rock[i]).slice(0, 20);
 if (rockCells.length) log(applyCommand(w, F, { c: 'designate', kind: 'mine', cells: rockCells }), 'mine');
 
+// minimal stand-in for a human player: draft and fight during threats, keep research going
+function autoPlayer() {
+  const cols = w.colonists(F).filter(p => !p.downed && !p.mental);
+  const enemies = [...w.pawns.values()].filter(e => !e.dead && !e.downed && cols.some(c => pawnHostileTo(w, c, e)) && (e.lord || (e.animal?.manhunter || 0) > w.tick) && m.connected(m.idx(e.x, e.y), m.idx(cx, cy)) && Math.hypot(e.x - cx, e.y - cy) < 45);
+  if (enemies.length) {
+    for (const c of cols) {
+      if (c.job?.type === 'attack' && w.pawns.get(c.job.t!) && !w.pawns.get(c.job.t!)!.downed) continue;
+      const e = enemies.reduce((a, b) => Math.hypot(a.x - c.x, a.y - c.y) < Math.hypot(b.x - c.x, b.y - c.y) ? a : b);
+      applyCommand(w, F, { c: 'attack', pawns: [c.id], target: e.id });
+    }
+  } else if (cols.some(c => c.drafted)) applyCommand(w, F, { c: 'draft', pawns: cols.map(c => c.id), on: false });
+  // hunt when food runs low (a player would)
+  const foodDays = [...w.items.values()].filter(i => ITEMS[i.def].food && ITEMS[i.def].cat !== 'drug').reduce((a, i) => a + i.count * ITEMS[i.def].food!.nutrition, 0) / Math.max(1, w.colonists(F).length * 1.6);
+  const hunting = [...w.pawns.values()].filter(a => a.desig === 'hunt' && !a.dead).length;
+  if (foodDays < 3 && hunting < 2) {
+    const prey = [...w.pawns.values()].filter(a => a.faction === 0 && !a.dead && a.race !== 'human' && !a.desig && ['deer', 'alpaca', 'muffalo', 'boar', 'hare'].includes(a.race)).sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy))[0];
+    if (prey) applyCommand(w, F, { c: 'designate', kind: 'hunt', cells: [m.idx(prey.x, prey.y)] });
+  }
+  const r = w.research[F];
+  if (!r.cur) { const next = Object.keys(RESEARCH).find(id => !r.done.includes(id) && canStartResearch(w, F, id)); if (next) applyCommand(w, F, { c: 'research', id: next }); }
+}
+
 let campfire = [...w.buildings.values()].find(b => b.def === 'campfire');
 const tStart = Date.now();
 let lastReport = 0;
 let errors = 0;
 for (let t = 0; t < days * TICKS_PER_DAY; t++) {
   try { simTick(w); } catch (e) { errors++; if (errors < 5) console.error('TICK ERROR', w.tick, e); if (errors > 50) break; }
-  if (!campfire) { campfire = [...w.buildings.values()].find(b => b.def === 'campfire'); if (campfire) applyCommand(w, F, { c: 'bill', op: 'add', bench: campfire.id, recipe: 'cook_simple' }); }
+  if (w.tick % 300 === 0) autoPlayer();
+  if (!campfire) { campfire = [...w.buildings.values()].find(b => b.def === 'campfire'); if (campfire && !campfire.bills?.length) applyCommand(w, F, { c: 'bill', op: 'add', bench: campfire.id, recipe: 'cook_simple' }); }
   if (w.tick - lastReport >= TICKS_PER_DAY / 2) {
     lastReport = w.tick;
     const colonists = w.colonists(F);

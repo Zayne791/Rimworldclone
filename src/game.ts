@@ -78,7 +78,7 @@ export class Game {
     else this.renderer.centerOn(world.map.w >> 1, world.map.h >> 1);
     this.renderer.cam.zoom = 3 * this.renderer.dpr;
     this.renderer.clampCam();
-    window.addEventListener('resize', () => this.renderer.resize());
+    window.addEventListener('resize', this.onResize);
     this.lastDay = world.day;
   }
 
@@ -94,7 +94,8 @@ export class Game {
     };
     this.raf = requestAnimationFrame(loop);
   }
-  stop() { this.running = false; cancelAnimationFrame(this.raf); this.net?.close(); }
+  private onResize = () => this.renderer.resize();
+  stop() { this.running = false; cancelAnimationFrame(this.raf); this.net?.close(); this.input?.destroy(); window.removeEventListener('resize', this.onResize); }
 
   effectiveSpeed(): number {
     const w = this.world;

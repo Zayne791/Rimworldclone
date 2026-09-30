@@ -17,18 +17,20 @@ export class Input {
   boxStart: [number, number] | null = null;
   vel = { x: 0, y: 0 };
   lastMove = { x: 0, y: 0, t: 0 };
+  ac = new AbortController();
 
   constructor(g: Game, el: HTMLCanvasElement) {
     this.g = g; this.el = el;
-    el.addEventListener('pointerdown', e => this.down(e));
-    window.addEventListener('pointermove', e => this.move(e));
-    window.addEventListener('pointerup', e => this.up(e));
-    window.addEventListener('pointercancel', e => this.up(e, true));
-    el.addEventListener('wheel', e => this.wheel(e), { passive: false });
-    el.addEventListener('contextmenu', e => e.preventDefault());
-    window.addEventListener('keydown', e => this.key(e, true));
-    window.addEventListener('keyup', e => this.key(e, false));
-    document.addEventListener('gesturestart', e => e.preventDefault());
+    const o = { signal: this.ac.signal };
+    el.addEventListener('pointerdown', e => this.down(e), o);
+    window.addEventListener('pointermove', e => this.move(e), o);
+    window.addEventListener('pointerup', e => this.up(e), o);
+    window.addEventListener('pointercancel', e => this.up(e, true), o);
+    el.addEventListener('wheel', e => this.wheel(e), { passive: false, signal: this.ac.signal });
+    el.addEventListener('contextmenu', e => e.preventDefault(), o);
+    window.addEventListener('keydown', e => this.key(e, true), o);
+    window.addEventListener('keyup', e => this.key(e, false), o);
+    document.addEventListener('gesturestart', e => e.preventDefault(), o);
   }
 
   get r() { return this.g.renderer; }
@@ -63,6 +65,8 @@ export class Input {
       this.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), cx, cy, zoom: this.r.cam.zoom, wx, wy };
     }
   }
+
+  destroy() { this.ac.abort(); this.clearLp(); }
 
   clearLp() { if (this.lp) { clearTimeout(this.lp); this.lp = null; } }
 

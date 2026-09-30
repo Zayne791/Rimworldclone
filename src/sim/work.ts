@@ -12,7 +12,7 @@ import { mkJob } from './jobs';
 import { blueprintNeeds, buildingMaxHp, stackLimit } from './things';
 import { findStorageFor, itemAccessible, storagePriorityAt, filterAllows, countResource, storageOwnerAt } from './zones';
 import { needsTending } from './health';
-import { skillLevel, weaponOf, isIncapable, isAnimal } from './stats';
+import { skillLevel, weaponOf, isIncapable, isAnimal, isMech } from './stats';
 import { isResearched } from './research';
 import { roofSupported } from './rooms';
 import { refuelNeeded } from './environment';
@@ -509,6 +509,13 @@ const RESEARCH_HITECH: Record<string, boolean> = Object.fromEntries(Object.value
 
 // ---------------- food ----------------
 export function foodScore(w: World, eater: Pawn, it: Item): number {
+  if (it.corpse) {
+    // only meat-eating animals eat corpses (never their own kind, never machines)
+    const ad = eater.race !== 'human' ? ANIMALS[eater.race] : null;
+    if (!ad || ad.mech || (ad.diet !== 'carnivore' && !(ad.diet === 'omnivore' && ad.predator))) return -1;
+    if (it.corpse.race === eater.race || isMech(it.corpse) || (it.rot || 0) >= 1) return -1;
+    return 15;
+  }
   const fd = ITEMS[it.def].food;
   if (!fd) return -1;
   if ((it.rot || 0) >= 1) return -1;
@@ -525,8 +532,7 @@ export function foodScore(w: World, eater: Pawn, it: Item): number {
   const ad = ANIMALS[eater.race];
   if (!ad) return -1;
   if (ad.diet === 'grazer' && !(fd.kind === 'veg' || fd.kind === 'hay')) return -1;
-  if (ad.diet === 'carnivore' && !(fd.kind === 'meat' || it.corpse)) return -1;
-  if (it.corpse && (it.corpse.race === eater.race)) return -1;
+  if (ad.diet === 'carnivore' && fd.kind !== 'meat') return -1;
   if (fd.kind === 'meal') return 5;
   return fd.kind === 'hay' ? 20 : 10;
 }

@@ -73,11 +73,13 @@ function wrapPeerConn(dc: DataConnection): Conn {
 
 export interface HostTransport { code: string; onConnection: (c: Conn) => void; close(): void }
 
-export async function openHost(onConnection: (c: Conn) => void): Promise<HostTransport> {
+export async function openHost(onConnection: (c: Conn) => void, preferred?: string): Promise<HostTransport> {
   const relay = relayUrl();
-  if (relay) return openRelayHost(relay, onConnection);
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const code = newRoomCode();
+  if (relay) return openRelayHost(relay, onConnection, preferred);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    // the preferred code may still be held by the broker for a few seconds after a reload: retry it before giving up on it
+    const code = preferred && attempt < 2 ? preferred : newRoomCode();
+    if (preferred && attempt === 1) await new Promise(r => setTimeout(r, 2500));
     try {
       const peer = await new Promise<Peer>((res, rej) => {
         const p = new Peer(PREFIX + code, peerOptions());
@@ -118,23 +120,36 @@ export async function connectClient(code: string, status: (s: string) => void): 
 }
 
 // ---------------- WebSocket relay ----------------
-function openRelayHost(url: string, onConnection: (c: Conn) => void): Promise<HostTransport> {
-  const code = newRoomCode();
+async function openRelayHost(url: string, onConnection: (c: Conn) => void, preferred?: string): Promise<HostTransport> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const code = preferred && attempt === 0 ? preferred : newRoomCode();
+    try { return await relayHostOnce(url, code, onConnection); }
+    catch (e: any) { if (e?.code !== 4409) throw e; }
+  }
+  throw new Error('Could not allocate a room code');
+}
+function relayHostOnce(url: string, code: string, onConnection: (c: Conn) => void): Promise<HostTransport> {
   return new Promise((res, rej) => {
     const ws = new WebSocket(`${url}${url.includes('?') ? '&' : '?'}room=${code}&role=host`);
     const conns = new Map<string, Conn>();
     const ht: HostTransport = { code, onConnection, close: () => ws.close() };
     const rx = new Map<string, (s: string) => void>();
-    ws.onopen = () => res(ht);
-    ws.onerror = () => rej(new Error('Relay server unreachable'));
+    let ok = false;
+    ws.onerror = () => { if (!ok) rej(new Error('Relay server unreachable')); };
+    ws.onclose = (e) => {
+      if (!ok) { const err: any = new Error('Relay refused the room'); err.code = e.code; rej(err); return; }
+      for (const c of conns.values()) c.onClose();
+      conns.clear();
+    };
     ws.onmessage = (ev) => {
       const m = JSON.parse(ev.data);
-      if (m.sys === 'join') {
+      if (m.sys === 'ok') { ok = true; res(ht); }
+      else if (m.sys === 'join') {
         const c: Conn = { id: m.cid, send: (s) => sendChunked(x => ws.send(JSON.stringify({ to: m.cid, d: x })), s), close: () => ws.send(JSON.stringify({ sys: 'kick', to: m.cid })), onMessage: () => {}, onClose: () => {} };
         conns.set(m.cid, c);
         rx.set(m.cid, reassembler(s => c.onMessage(s)));
         ht.onConnection(c);
-      } else if (m.sys === 'leave') { conns.get(m.cid)?.onClose(); conns.delete(m.cid); }
+      } else if (m.sys === 'leave') { conns.get(m.cid)?.onClose(); conns.delete(m.cid); rx.delete(m.cid); }
       else if (m.from) rx.get(m.from)?.(m.d);
     };
   });
@@ -144,9 +159,12 @@ function connectRelayClient(url: string, code: string): Promise<Conn> {
     const ws = new WebSocket(`${url}${url.includes('?') ? '&' : '?'}room=${code}&role=client`);
     const c: Conn = { id: 'host', send: (s) => sendChunked(x => ws.send(x), s), close: () => ws.close(), onMessage: () => {}, onClose: () => {} };
     const rx = reassembler(s => c.onMessage(s));
-    ws.onopen = () => res(c);
-    ws.onerror = () => rej(new Error('Relay server unreachable'));
-    ws.onclose = (e) => { if (e.code === 4404) rej(new Error('No game with that room code.')); c.onClose(); };
-    ws.onmessage = (ev) => rx(ev.data);
+    let ok = false;
+    ws.onerror = () => { if (!ok) rej(new Error('Relay server unreachable')); };
+    ws.onclose = (e) => { if (!ok) { rej(new Error(e.code === 4404 ? 'No game with that room code.' : 'Could not reach the host.')); return; } c.onClose(); };
+    ws.onmessage = (ev) => {
+      if (!ok) { if (String(ev.data) === '{"sys":"ok"}') { ok = true; res(c); } return; }
+      rx(ev.data);
+    };
   });
 }

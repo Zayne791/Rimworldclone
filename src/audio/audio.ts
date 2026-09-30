@@ -163,4 +163,5 @@ const VOICES: Record<string, Voice> = {
   trap: (a, t, v) => { a.burst(t, 0.1, 0.4 * v, 2500, 2); a.tone(t, 200, 0.1, 'square', 0.08 * v, 0.4); },
   error: (a, t) => { a.tone(t, 200, 0.12, 'square', 0.05); a.tone(t + 0.1, 150, 0.15, 'square', 0.05); },
   chat: (a, t) => a.tone(t, 1000, 0.06, 'triangle', 0.05, 1.3),
+  draft: (a, t) => { a.burst(t, 0.12, 0.2, 2600, 1.5, 'highpass'); a.tone(t + 0.04, 330, 0.1, 'square', 0.05); a.tone(t + 0.12, 495, 0.14, 'square', 0.05); },
 };

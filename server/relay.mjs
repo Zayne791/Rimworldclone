@@ -31,21 +31,24 @@ wss.on('connection', (ws, req) => {
   const role = url.searchParams.get('role');
   if (!code) { ws.close(4400, 'no room'); return; }
   if (role === 'host') {
-    if (rooms.has(code)) { ws.close(4409, 'room exists'); return; }
+    const old = rooms.get(code);
+    if (old && old.host.readyState === 1) { ws.close(4409, 'room exists'); return; }
     const room = { host: ws, clients: new Map() };
     rooms.set(code, room);
+    ws.send(JSON.stringify({ sys: 'ok' }));
     ws.on('message', (buf) => {
       let m; try { m = JSON.parse(buf.toString()); } catch { return; }
       if (m.sys === 'kick') { room.clients.get(m.to)?.close(); return; }
       const c = room.clients.get(m.to);
       if (c && c.readyState === 1) c.send(m.d);
     });
-    ws.on('close', () => { for (const c of room.clients.values()) c.close(4410, 'host left'); rooms.delete(code); });
+    ws.on('close', () => { for (const c of room.clients.values()) c.close(4410, 'host left'); if (rooms.get(code) === room) rooms.delete(code); });
   } else {
     const room = rooms.get(code);
     if (!room) { ws.close(4404, 'no such room'); return; }
     const cid = 'c' + nextCid++;
     room.clients.set(cid, ws);
+    ws.send(JSON.stringify({ sys: 'ok' }));
     room.host.send(JSON.stringify({ sys: 'join', cid }));
     ws.on('message', (buf) => { if (room.host.readyState === 1) room.host.send(JSON.stringify({ from: cid, d: buf.toString() })); });
     ws.on('close', () => { room.clients.delete(cid); if (room.host.readyState === 1) room.host.send(JSON.stringify({ sys: 'leave', cid })); });

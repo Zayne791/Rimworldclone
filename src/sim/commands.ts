@@ -15,7 +15,7 @@ import { assignJob, assignBed, endJob } from './ai';
 import { executeTrade, executeP2P, type P2POffer } from './trade';
 import { findBedFor, findMedicine } from './work';
 import { isAnimal } from './stats';
-import { destroyBuilding } from './construction';
+import { destroyBuilding, addStarterBills } from './construction';
 import { TICKS_PER_DAY } from '../core/constants';
 import { addThoughtToAll } from './mood';
 
@@ -152,6 +152,7 @@ HANDLERS.build = (w, f, c) => {
     if (d.work === 0) {
       const b = makeBuilding(w, def, x, y, rot, stuff, f);
       w.register(b);
+      addStarterBills(w, b);
     } else {
       const bp: Blueprint = { id: w.newId(), kind: 'blueprint', def, x, y, rot: d.rotatable ? rot : 0, stuff, faction: f, delivered: {}, work: 0 };
       w.register(bp);

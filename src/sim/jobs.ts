@@ -15,8 +15,8 @@ import { gainXp, fireAt, meleeAttack, pawnHostileTo, hitChance } from './combat'
 import { tend, die, setDowned, needsTending, applyDamage } from './health';
 import { addThought, changeOpinion } from './mood';
 import { roomAt, impressLabel } from './rooms';
-import { lineOfSight } from './path';
-import { dist } from '../core/util';
+import { lineOfSight, bfsNearest } from './path';
+import { dist, dist2 } from '../core/util';
 import { TICKS_PER_DAY } from '../core/constants';
 import { petName } from './pawngen';
 import { FILTH, IMPASSABLE, ROOF } from './map';
@@ -449,11 +449,12 @@ def('eat', {
       const r = moveTo(w, p, it.x, it.y, true);
       if (r === 'fail') return 'fail';
       if (r !== 'arrived') return 'ongoing';
-      const fd = ITEMS[it.def].food!;
-      const need = Math.max(1, Math.ceil((1 - p.needs.food) / fd.nutrition));
-      const count = it.corpse ? 1 : Math.min(it.count, fd.kind === 'meal' && fd.nutrition >= 0.5 ? 1 : need);
       j.data = { ...(j.data || {}), foodDef: it.def, poison: (it as any).poison, rot: it.rot || 0 };
       if (it.corpse) { j.data.corpse = it.id; j.s = 2; j.w = 0; return 'ongoing'; }
+      const fd = ITEMS[it.def].food;
+      if (!fd) return 'fail';
+      const need = Math.max(1, Math.ceil((1 - p.needs.food) / fd.nutrition));
+      const count = Math.min(it.count, fd.kind === 'meal' && fd.nutrition >= 0.5 ? 1 : need);
       if (!pickUp(w, p, it, count)) return 'fail';
       j.s = 1;
       // find a table seat
@@ -948,8 +949,12 @@ def('attack', {
   label: (w, p, j) => { const t = w.things.get(j.t!); return t && t.kind === 'pawn' ? `attacking ${pawnShortName(t)}` : 'attacking'; },
   tick(w, p, j) {
     const t = w.things.get(j.t!) as Pawn | Building | undefined;
-    if (!t || (t.kind === 'pawn' && (t.dead || (t.downed && !j.data?.kill)))) return 'done';
+    if (!t || (t.kind === 'pawn' && (t.dead || (t.downed && !j.data?.kill)))) {
+      if (j.data?.hunt && (!t || t.dead)) haulKillHome(w, p, j);
+      return 'done';
+    }
     if (t.kind !== 'pawn' && t.kind !== 'building') return 'fail';
+    if (j.data?.hunt) { j.data.lx = t.x; j.data.ly = t.y; }
     const wp = weaponOf(p);
     const tx = t.x, ty = t.y;
     const d = dist(p.x, p.y, tx, ty);
@@ -998,6 +1003,29 @@ def('attack', {
     return 'ongoing';
   },
 });
+
+/** hunters carry their kill next to the butcher so it gets processed (stockpiles don't take corpses by default) */
+function haulKillHome(w: World, p: Pawn, j: Job) {
+  const m = w.map;
+  if (j.data?.lx === undefined || p.downed || !w.isColonist(p)) return;
+  let corpse: Item | undefined;
+  for (let dy = -1; dy <= 1 && !corpse; dy++) for (let dx = -1; dx <= 1 && !corpse; dx++) {
+    if (!m.inb(j.data.lx + dx, j.data.ly + dy)) continue;
+    for (const id of m.items[m.idx(j.data.lx + dx, j.data.ly + dy)] || []) { const it = w.items.get(id); if (it?.corpse && it.corpse.id === j.t) { corpse = it; break; } }
+  }
+  if (!corpse) return;
+  let bench: Building | null = null, bd = Infinity;
+  for (const b of w.buildings.values()) {
+    if (b.faction !== p.faction || !BUILDINGS[b.def].bench?.recipes.includes('butcher')) continue;
+    const d = dist2(corpse.x, corpse.y, b.x, b.y);
+    if (d < bd) { bd = d; bench = b; }
+  }
+  if (!bench) return;
+  const [ix, iy] = w.interactCell(bench);
+  const dest = bfsNearest(w, ix, iy, i => !m.items[i]?.length && !m.bld[i] && !m.isWater(i), 12);
+  if (dest < 0 || !m.connected(m.idx(p.x, p.y), dest, false)) return;
+  p.queue.unshift(mkJob('haul', { t: corpse.id, c: dest, forced: true }));
+}
 
 def('flee', {
   label: () => 'fleeing',

@@ -1,0 +1,31 @@
+// Start a game, trigger a raid, screenshot the draft-all flow (iPad portrait by default).
+import { chromium, devices } from 'playwright';
+const dev = process.argv[2] || 'iPad Pro 11';
+const pre = process.argv[3] || 'test-output/raid';
+const b = await chromium.launch();
+const ctx = await b.newContext({ ...devices[dev] });
+const p = await ctx.newPage();
+const errs = [];
+p.on('pageerror', e => errs.push('pageerror: ' + e.message + '\n' + e.stack));
+p.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
+await p.goto('http://127.0.0.1:5173/');
+await p.waitForSelector('[data-m="new"]');
+await p.tap('[data-m="new"]'); await p.tap('[data-m="next"]');
+await p.waitForSelector('[data-m="site"]', { timeout: 20000 }); await p.tap('[data-m="site"]');
+await p.waitForSelector('[data-m="go"]'); await p.tap('[data-m="go"]');
+await p.waitForTimeout(1500);
+const shot = async (n) => { await p.waitForTimeout(500); await p.screenshot({ path: `${pre}-${n}.png` }); };
+await p.evaluate(async () => {
+  const st = await import('/src/sim/storyteller.ts');
+  const g = window.__game;
+  st.incidentRaid(g.world, g.faction, 200);
+});
+await p.waitForTimeout(800);
+await shot('arrive');
+await p.tap('.cbdraft'); await shot('drafted');
+await p.evaluate(() => window.__game.setSpeed(3));
+await p.waitForTimeout(9000);
+await shot('fight');
+await p.tap('.cbdraft'); await shot('undrafted');
+console.log(errs.join('\n') || 'no errors');
+await b.close();

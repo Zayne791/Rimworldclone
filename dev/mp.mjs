@@ -41,5 +41,17 @@ await A.screenshot({ path: 'test-output/mp-A.png' }); await B.screenshot({ path:
 // jump A camera to B colony
 await A.evaluate(() => { const g = window.__game; const pl = g.world.players.find(p => !p.isHost); g.jumpTo(pl.startX, pl.startY); });
 await A.waitForTimeout(800); await A.screenshot({ path: 'test-output/mp-A-seesB.png' });
+// connection drop on the client -> "Connection lost" -> Reconnect reclaims the same colony
+const before = await B.evaluate(() => ({ f: window.__game.faction, n: window.__game.world.colonists(window.__game.faction).length }));
+await B.evaluate(() => window.__game.net.conn.close());
+await B.waitForSelector('#lostbox', { timeout: 10000 });
+await B.screenshot({ path: 'test-output/mp-B-lost.png' });
+await B.tap('#lostbox [data-x="re"]');
+await B.waitForFunction(() => !document.getElementById('lostbox') && window.__game?.net?.conn, null, { timeout: 40000 });
+await B.waitForTimeout(1500);
+const after = await B.evaluate(() => ({ f: window.__game.faction, n: window.__game.world.colonists(window.__game.faction).length, tick: window.__game.world.tick }));
+console.log('reconnect', JSON.stringify(before), '->', JSON.stringify(after));
+const hostPlayers = await A.evaluate(() => window.__game.world.players.map(p => p.name + ':' + p.faction + ':' + p.connected));
+console.log('host players after reconnect', JSON.stringify(hostPlayers));
 console.log(errs.slice(0, 15).join('\n'));
 await b.close();

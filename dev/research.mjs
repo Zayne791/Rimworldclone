@@ -1,0 +1,20 @@
+// Screenshot the research window on a device (select a deep node to show highlighted prerequisites).
+import { chromium, devices } from 'playwright';
+const dev = process.argv[2] || 'iPad Pro 11';
+const pre = process.argv[3] || 'test-output/res';
+const b = await chromium.launch();
+const ctx = await b.newContext({ ...devices[dev] });
+const p = await ctx.newPage();
+const errs = [];
+p.on('pageerror', e => errs.push('pageerror: ' + e.message));
+await p.goto('http://127.0.0.1:5173/');
+await p.waitForSelector('[data-m="new"]');
+await p.tap('[data-m="new"]'); await p.tap('[data-m="next"]');
+await p.waitForSelector('[data-m="site"]', { timeout: 20000 }); await p.tap('[data-m="site"]');
+await p.waitForSelector('[data-m="go"]'); await p.tap('[data-m="go"]');
+await p.waitForTimeout(1200);
+await p.tap('#tab-research'); await p.waitForTimeout(400);
+await p.tap('[data-v="ship_reactor"]'); await p.waitForTimeout(400);
+await p.screenshot({ path: `${pre}-tree.png` });
+console.log(errs.join('\n') || 'no errors');
+await b.close();

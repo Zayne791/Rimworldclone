@@ -220,12 +220,23 @@ export function joyJob(w: World, p: Pawn): Job | null {
   return pick;
 }
 
+/** idle colonists drift around their colony instead of random-walking across the map */
+function homeAnchor(w: World, p: Pawn): [number, number] | null {
+  if (p.race !== 'human' || !w.isPlayerFaction(p.faction)) return null;
+  const pl = w.playerByFaction(p.faction);
+  return pl && pl.startX !== undefined ? [pl.startX, pl.startY!] : null;
+}
+
 export function wanderJob(w: World, p: Pawn, r: number, cx?: number, cy?: number): Job | null {
   const m = w.map;
-  const ox = cx ?? p.x, oy = cy ?? p.y;
+  let ox = cx ?? p.x, oy = cy ?? p.y;
+  const home = cx === undefined ? homeAnchor(w, p) : null;
+  const leash = 22;
+  if (home && dist2(p.x, p.y, home[0], home[1]) > leash * leash) { ox = home[0]; oy = home[1]; r = Math.min(r, 8); }
   for (let k = 0; k < 10; k++) {
     const x = ox + w.rng.int(-r, r), y = oy + w.rng.int(-r, r);
     if (!m.inb(x, y)) continue;
+    if (home && k < 8 && dist2(x, y, home[0], home[1]) > leash * leash) continue;
     const i = m.idx(x, y);
     if (!m.passable(i) || m.fire[i] || m.isWater(i)) continue;
     if (!m.connected(m.idx(p.x, p.y), i, false)) continue;

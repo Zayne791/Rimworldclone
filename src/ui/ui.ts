@@ -154,10 +154,21 @@ export class UI {
   renderColbar() {
     const g = this.g;
     const cols = g.world.colonists(g.faction);
-    const keys = cols.map(p => p.id).join(',');
+    // one-tap "draft everyone" while a threat is on the map (or anyone is drafted)
+    const able = cols.filter(p => !p.downed && !p.mental);
+    const anyDrafted = able.some(p => p.drafted);
+    const showDraft = able.length > 1 && (anyDrafted || threatActive(g));
+    const keys = cols.map(p => p.id).join(',') + (showDraft ? '+d' : '');
     if (this.sig.colkeys !== keys) {
       this.sig.colkeys = keys; this.sig.col = '';
-      this.colbar.innerHTML = cols.map(p => `<div class="cb" data-a="colsel" data-id="${p.id}"><img alt=""><div class="nm"></div><div class="mb"><i></i></div><div class="st"></div></div>`).join('');
+      this.colbar.innerHTML = cols.map(p => `<div class="cb" data-a="colsel" data-id="${p.id}"><img alt=""><div class="nm"></div><div class="mb"><i></i></div><div class="st"></div></div>`).join('')
+        + (showDraft ? `<div class="cb cbdraft" data-a="draftall"><span class="ic">${iconImg('draft')}</span><div class="nm"></div></div>` : '');
+    }
+    if (showDraft) {
+      const el = this.colbar.lastElementChild as HTMLElement;
+      const all = able.every(p => p.drafted);
+      const lbl = all ? 'Undraft' : 'Draft all';
+      if (el && el.dataset.sig !== lbl) { el.dataset.sig = lbl; (el.querySelector('.nm') as HTMLElement).textContent = lbl; el.classList.toggle('on', all); }
     }
     const cards = this.colbar.children;
     cols.forEach((p, k) => {
@@ -371,6 +382,13 @@ export class UI {
   }
 }
 
+function threatActive(g: Game): boolean {
+  const w = g.world;
+  for (const l of w.lords.values()) if ((l.kind === 'assault' || l.kind === 'mech') && l.stage !== 'flee' && l.target === g.faction) return true;
+  for (const p of w.pawns.values()) if ((p.animal?.manhunter || 0) > w.tick && !p.dead) return true;
+  return false;
+}
+
 // ---------------- global handlers ----------------
 const HANDLERS: Record<string, Handler> = {
   tab: (el, ui) => ui.openTab(el.dataset.v!),
@@ -383,6 +401,13 @@ const HANDLERS: Record<string, Handler> = {
     if (ui.g.selection.has(id) && ui.g.selection.size === 1) ui.g.jumpTo(p.x, p.y);
     else { ui.g.select([id]); }
     ui.g.audio.play('click');
+  },
+  draftall: (el, ui) => {
+    const able = ui.g.world.colonists(ui.g.faction).filter(p => !p.downed && !p.mental);
+    const on = !able.every(p => p.drafted);
+    ui.g.cmd({ c: 'draft', pawns: able.map(p => p.id), on });
+    if (on) ui.g.select(able.map(p => p.id));
+    ui.g.audio.play(on ? 'draft' : 'click');
   },
   letter: (el, ui) => { W.openLetter(ui, +el.dataset.id!); },
   alert: (el, ui) => { const a = ui.alertList[+el.dataset.k!]; if (a?.x !== undefined) ui.g.jumpTo(a.x, a.y!); if (a?.id) ui.g.select([a.id]); },

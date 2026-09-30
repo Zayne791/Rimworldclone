@@ -106,6 +106,11 @@ h3 { font-size: 1.05em; color: var(--accent); margin: 8px 0 4px; }
 .cb { flex: none; width: 52px; display: flex; flex-direction: column; align-items: center; cursor: pointer; background: rgba(20,16,26,0.8); border: 2px solid var(--edge); box-shadow: inset 0 0 0 1px var(--line); padding: 2px 2px 3px; position: relative; }
 .cb.sel { box-shadow: inset 0 0 0 2px var(--accent); }
 .cb.drafted { background: rgba(90,30,26,0.85); }
+.cb.cbdraft { justify-content: center; background: #6a2420; box-shadow: inset 0 1px 0 #b0504a; animation: pulse 1.2s infinite; }
+.cb.cbdraft.on { background: #3a3444; box-shadow: inset 0 1px 0 #6a6078; animation: none; }
+.cb.cbdraft .ic { height: 42px; display: flex; align-items: center; justify-content: center; }
+.cb.cbdraft .ic img { width: 32px; height: 32px; image-rendering: pixelated; }
+.cb.cbdraft .nm { color: var(--text, #fff); }
 .cb img { width: 42px; height: 42px; image-rendering: pixelated; }
 .cb .nm { font-size: 10px; max-width: 48px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); }
 .cb .mb { width: 42px; height: 4px; background: #000; margin-top: 1px; }
@@ -206,9 +211,10 @@ h3 { font-size: 1.05em; color: var(--accent); margin: 8px 0 4px; }
 
 /* research tree */
 .rtree { position: relative; }
-.rnode { position: absolute; width: 150px; min-height: 62px; padding: 5px 7px; cursor: pointer; background: linear-gradient(#2e283a, #242030); border: 2px solid var(--edge); box-shadow: inset 0 1px 0 #4a4258; font-size: 0.82em; }
+.rnode { position: absolute; width: 150px; min-height: 62px; padding: 4px 6px; overflow: hidden; line-height: 1.15; display: flex; flex-direction: column; justify-content: center; cursor: pointer; background: linear-gradient(#2e283a, #242030); border: 2px solid var(--edge); box-shadow: inset 0 1px 0 #4a4258; font-size: 0.82em; }
 .rnode.done { background: linear-gradient(#34503a, #26402a); }
-.rnode.cur { box-shadow: inset 0 0 0 2px var(--accent); }
+.rnode.cur { box-shadow: inset 0 0 0 2px var(--blue); }
+.rnode.sel { border-color: var(--accent); }
 .rnode.locked { opacity: 0.5; }
 .rnode .bar { margin-top: 4px; height: 6px; }
 .rnode .bar > i { background: var(--blue); }

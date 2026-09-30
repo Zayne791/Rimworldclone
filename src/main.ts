@@ -52,6 +52,7 @@ function menu() {
       const { ClientSession } = await import('./net/session');
       const s = new ClientSession();
       const w = await s.connect(code, name, colony, (msg) => { const el = document.getElementById('j-status'); if (el) el.textContent = msg; });
+      s.onLost = () => showLost(code, name, colony);
       if (s.myFaction && s.started) { startGame(w, s.myFaction, s); return; }
       // choose colonists + landing site, then ask host to spawn
       colonistScreen(w, s.slot, async (pawns, pet, site) => {
@@ -63,6 +64,38 @@ function menu() {
       }, `Joining ${w.players.find(p => p.isHost)?.colonyName || 'the game'}`);
       void siteScreen;
     },
+  });
+}
+
+// client lost the host: offer to reconnect (the saved token reclaims the same colony)
+function showLost(code: string, name: string, colony: string) {
+  const g = current;
+  if (!g || document.getElementById('lostbox')) return;
+  const el = document.createElement('div');
+  el.id = 'lostbox'; el.className = 'modal-bg'; el.style.bottom = '0'; el.style.zIndex = '60';
+  el.innerHTML = `<div class="win px" style="max-width:420px;padding:14px"><h2>Connection lost</h2>
+    <div>The host closed the game or the connection dropped. Your colony is safe on the host's world.</div>
+    <div id="lost-st" class="small dim" style="margin:8px 0"></div>
+    <div class="row wrap" style="gap:8px"><button class="btn good" data-x="re">Reconnect</button><button class="btn" data-x="menu">Main menu</button></div></div>`;
+  document.getElementById('screens')!.appendChild(el);
+  const st = el.querySelector('#lost-st') as HTMLElement;
+  let busy = false;
+  el.addEventListener('click', async (e) => {
+    const b = (e.target as HTMLElement).closest('[data-x]') as HTMLElement | null;
+    if (!b || busy) return;
+    if (b.dataset.x === 'menu') { el.remove(); g.onExit?.(); return; }
+    busy = true; st.textContent = 'Reconnecting…';
+    try {
+      const { ClientSession } = await import('./net/session');
+      const s = new ClientSession();
+      const w = await s.connect(code, name, colony, (msg) => { st.textContent = msg; });
+      s.onLost = () => showLost(code, name, colony);
+      el.remove();
+      const cam = { ...g.renderer.cam };
+      g.stop(); document.getElementById('hud')!.innerHTML = '';
+      if (s.myFaction && s.started) { const ng = startGame(w, s.myFaction, s); Object.assign(ng.renderer.cam, cam); ng.centered = true; }
+      else { g.onExit?.(); }
+    } catch (err) { st.innerHTML = `<span class="bad">${String((err as any)?.message || err)}</span>`; busy = false; }
   });
 }
 

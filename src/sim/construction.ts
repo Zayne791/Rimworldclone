@@ -4,7 +4,7 @@ import type { Building, Blueprint, Pawn } from './types';
 import { BUILDINGS } from '../data/buildings';
 import { TERRAIN_INDEX, ROCKS } from '../data/terrain';
 import { PLANTS } from '../data/plants';
-import { makeBuilding, blueprintCost, placeItem, makeItem, spawnItem, buildingLabel, pawnShortName } from './things';
+import { makeBuilding, blueprintCost, placeItem, makeItem, spawnItem, buildingLabel, pawnShortName, newBill } from './things';
 import { skillLevel } from './stats';
 import { checkRoofCollapse } from './rooms';
 import { clamp } from '../core/util';
@@ -21,6 +21,15 @@ export function rollQuality(w: World, skill: number, inspired = false): number {
 
 const ART_NAMES_A = ['Dawn', 'Sorrow', 'The Wanderer', 'Starfall', 'Memory', 'The Last Harvest', 'Rust and Bone', 'Longing', 'The Crash', 'Hope', 'Silent Muffalo', 'Ember', 'The Hunt', 'Two Lovers', 'Mechanoid Dream', 'Frontier', 'The Lost Ship', 'Winter Song'];
 const ART_NAMES_B = ['in Stone', 'Rising', 'Remembered', 'at Dusk', 'Eternal', 'Unbound', 'No. 7', 'Revisited', '', '', ''];
+
+/** starter bills so a fresh kitchen/butcher works without extra taps (players can edit or remove them) */
+export function addStarterBills(w: World, b: Building) {
+  const d = BUILDINGS[b.def];
+  if (!b.bills || !d.bench || b.bills.length || !w.isPlayerFaction(b.faction)) return;
+  const own = [...w.buildings.values()].filter(o => o.faction === b.faction && o.id !== b.id && o.bills?.length);
+  if (d.bench.recipes.includes('butcher') && !own.some(o => o.bills!.some(x => x.recipe === 'butcher'))) { const bl = newBill(w, 'butcher'); bl.mode = 'forever'; b.bills.push(bl); }
+  if (d.bench.recipes.includes('cook_simple') && !own.some(o => o.bills!.some(x => x.recipe.startsWith('cook')))) { const bl = newBill(w, 'cook_simple'); bl.mode = 'until'; bl.target = 10; b.bills.push(bl); }
+}
 
 export function completeBlueprint(w: World, bp: Blueprint, builder: Pawn | null) {
   const m = w.map;
@@ -46,6 +55,7 @@ export function completeBlueprint(w: World, bp: Blueprint, builder: Pawn | null)
       w.letter(bp.faction, `${['awful', 'poor', 'normal', 'good', 'excellent', 'masterwork', 'legendary'][b.quality]} ${d.label}`, `${pawnShortName(builder)} has created a ${['awful', 'poor', 'normal', 'good', 'excellent', 'masterwork', 'legendary'][b.quality]} ${buildingLabel(b)}!`, 'good', b.x, b.y, b.id);
     }
   }
+  addStarterBills(w, b);
   if (d.art) b.artName = `"${w.rng.pick(ART_NAMES_A)} ${w.rng.pick(ART_NAMES_B)}"`.replace(' "', '"').replace(/ "$/, '"');
   // clear plants under footprint
   const cells = w.footprint(b.x, b.y, d.size, b.rot);
