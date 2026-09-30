@@ -16,6 +16,9 @@
   --warn: #ffb44a;
   --blue: #6fb0f0;
   --fs: 15px;
+  /* pixel font for titles & big buttons; a crisp system font for everything you have to read */
+  --font-pixel: 'Pixelify Sans', ui-monospace, monospace;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --tab-h: 62px;
   --top-h: 46px;
   --sat: env(safe-area-inset-top, 0px);
@@ -28,10 +31,19 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body {
   margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
-  font-family: 'Pixelify Sans', ui-monospace, monospace; font-size: var(--fs); line-height: 1.25;
+  font-family: var(--font-ui); font-size: var(--fs); line-height: 1.3;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; touch-action: none;
-  -webkit-font-smoothing: none; font-smooth: never;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
 }
+/* pixel-font elements: headings, window titles, primary buttons, top-bar clock, colonist names on cards */
+h1, h2, h3, .pix, .btn, .screen .menu .btn, #topbar .date b, #sheet .head .title, .rtitle, .tabname {
+  font-family: var(--font-pixel); -webkit-font-smoothing: none; font-smooth: never;
+}
+/* small buttons, tab captions, gizmo labels and chips read better in the UI font */
+.btn.sm, #bottombar .tab, #sheet .gizmos .btn, .chip, .seg .btn small, .bitem, .cb .nm, .alert, .letter-body {
+  font-family: var(--font-ui); -webkit-font-smoothing: antialiased;
+}
+.btn.sm, #bottombar .tab, #sheet .gizmos .btn { font-weight: 600; letter-spacing: 0.1px; }
 #app { position: fixed; inset: 0; }
 #view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; image-rendering: pixelated; }
 #hud { position: absolute; inset: 0; pointer-events: none; }
@@ -72,7 +84,7 @@ input:focus, textarea:focus { box-shadow: inset 0 0 0 1px var(--accent); }
 .wrap { flex-wrap: wrap; }
 .grow { flex: 1; min-width: 0; }
 .dim { color: var(--dim); } .faint { color: var(--faint); } .good { color: var(--good); } .bad { color: var(--bad); } .warn { color: var(--warn); } .accent { color: var(--accent); } .blue { color: var(--blue); }
-.small { font-size: 0.85em; } .tiny { font-size: 0.75em; }
+.small { font-size: 0.88em; } .tiny { font-size: 0.8em; }
 .right { margin-left: auto; }
 .center { text-align: center; }
 h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: 0.5px; }
@@ -112,7 +124,7 @@ h3 { font-size: 1.05em; color: var(--accent); margin: 8px 0 4px; }
 .cb.cbdraft .ic img { width: 32px; height: 32px; image-rendering: pixelated; }
 .cb.cbdraft .nm { color: var(--text, #fff); }
 .cb img { width: 42px; height: 42px; image-rendering: pixelated; }
-.cb .nm { font-size: 10px; max-width: 48px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); }
+.cb .nm { font-size: 11px; font-weight: 600; max-width: 48px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); }
 .cb .mb { width: 42px; height: 4px; background: #000; margin-top: 1px; }
 .cb .mb i { display: block; height: 100%; }
 .cb .st { position: absolute; top: 2px; right: 2px; font-size: 11px; line-height: 1; }

@@ -22,6 +22,8 @@ export interface ViewOpts { faction: number; selection: Set<number>; overlay?: O
 
 interface Particle { x: number; y: number; vx: number; vy: number; t: number; life: number; kind: string; c?: string; s?: string; size?: number }
 
+const UI_FONT = `-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
+
 export class Renderer {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
@@ -657,9 +659,12 @@ export class Renderer {
 
   drawTexts(ctx: CanvasRenderingContext2D, dt: number) {
     const T = this.texts;
-    const fs = Math.round(11 * this.dpr);
-    ctx.font = `${fs}px "Pixelify Sans", monospace`;
+    const fs = Math.round(11.5 * this.dpr);
+    ctx.font = `700 ${fs}px ${UI_FONT}`;
     ctx.textAlign = 'center';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(2, 2.5 * this.dpr);
+    ctx.strokeStyle = 'rgba(16,12,22,0.9)';
     for (let k = T.length - 1; k >= 0; k--) {
       const t = T[k];
       t.t += dt;
@@ -668,8 +673,7 @@ export class Renderer {
       const [sx, sy] = this.worldToScreen(t.x, t.y);
       const a = 1 - Math.max(0, (t.t - t.life * 0.6) / (t.life * 0.4));
       ctx.globalAlpha = a;
-      ctx.fillStyle = '#1c1622';
-      ctx.fillText(t.s || '', sx * this.dpr + this.dpr, sy * this.dpr + this.dpr);
+      ctx.strokeText(t.s || '', sx * this.dpr, sy * this.dpr);
       ctx.fillStyle = t.c || '#fff';
       ctx.fillText(t.s || '', sx * this.dpr, sy * this.dpr);
     }
@@ -680,8 +684,8 @@ export class Renderer {
 
   drawLabels(ctx: CanvasRenderingContext2D) {
     if (this.cam.zoom < 2.2 * this.dpr) return;
-    const fs = Math.round(10 * this.dpr);
-    ctx.font = `${fs}px "Pixelify Sans", monospace`;
+    const fs = Math.round(10.5 * this.dpr);
+    ctx.font = `600 ${fs}px ${UI_FONT}`;
     ctx.textAlign = 'center';
     for (const p of this.w.pawns.values()) {
       if (p.race !== 'human' && !p.animal?.tamed) continue;
