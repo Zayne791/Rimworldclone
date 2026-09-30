@@ -427,6 +427,7 @@ export class Renderer {
   }
 
   drawItem(ctx: CanvasRenderingContext2D, it: Item, k: number) {
+    if (!ITEMS[it.def] && !it.corpse) return; // never let one bad record take down the frame loop
     const X = it.x * TILE + (k ? 2 : 0), Y = it.y * TILE - (k ? 3 : 0);
     if (it.corpse) {
       const s = lyingSprite(it.corpse, true);

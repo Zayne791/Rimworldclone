@@ -109,9 +109,13 @@ export function incidentRaid(w: World, faction: number, points?: number, forceMe
 
 export function incidentManhunters(w: World, faction: number, points: number) {
   const [cx, cy] = colonyCenter(w, faction);
-  const race = w.rng.pick(['wolf', 'boar', 'muffalo', 'bear', 'cougar', 'deer'].filter(r => ANIMALS[r]));
+  // price animals by how dangerous they are, so small threat budgets send a boar or two, not a pair of grizzlies
+  const power = (r: string) => { const a = ANIMALS[r]; return a.hp * 0.5 + Math.max(...a.attacks.map(x => x.damage)) * 4; };
+  const races = ['wolf', 'boar', 'muffalo', 'bear', 'cougar', 'deer'].filter(r => ANIMALS[r]);
+  const affordable = races.filter(r => power(r) <= points);
+  const race = affordable.length ? w.rng.pick(affordable) : races.reduce((a, b) => (power(a) < power(b) ? a : b));
   const ad = ANIMALS[race];
-  const n = clamp(Math.round(points / (ad.size * 45)), 2, 18);
+  const n = clamp(Math.floor(points / power(race)), 1, 18);
   const e = arrivalEdge(w, cx, cy);
   if (!e) return;
   const pawns: Pawn[] = [];
@@ -121,7 +125,7 @@ export function incidentManhunters(w: World, faction: number, points: number) {
     pawns.push(a);
   }
   spawnGroupAt(w, pawns, e[0], e[1], null);
-  w.letter(faction, `Manhunter pack`, `A pack of ${n} maddened ${ad.label}s is coming! They will attack anyone they see. Stay indoors or fight them together.`, 'threat', e[0], e[1]);
+  w.letter(faction, n > 1 ? `Manhunter pack` : `Manhunter`, `${n > 1 ? `A pack of ${n} maddened ${ad.label}s is` : `A maddened ${ad.label} is`} coming! They will attack anyone they see. Stay indoors or fight them together.`, 'threat', e[0], e[1]);
 }
 
 function incidentMadAnimal(w: World, faction: number) {

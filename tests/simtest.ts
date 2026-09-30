@@ -65,6 +65,12 @@ function autoPlayer() {
     const prey = [...w.pawns.values()].filter(a => a.faction === 0 && !a.dead && a.race !== 'human' && !a.desig && ['deer', 'alpaca', 'muffalo', 'boar', 'hare'].includes(a.race)).sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy))[0];
     if (prey) applyCommand(w, F, { c: 'designate', kind: 'hunt', cells: [m.idx(prey.x, prey.y)] });
   }
+  // keep firewood coming (a player would keep designating trees)
+  const wood = [...w.items.values()].filter(i => i.def === 'wood').reduce((a, i) => a + i.count, 0);
+  if (wood < 60 && w.tick % 3000 === 0) {
+    const trees = cells(cx - 30, cy - 30, cx + 30, cy + 30).filter(i => m.plantDef(i)?.kind === 'tree' && !m.desig[i]).sort((a, b) => Math.hypot(a % m.w - cx, (a / m.w | 0) - cy) - Math.hypot(b % m.w - cx, (b / m.w | 0) - cy)).slice(0, 8);
+    if (trees.length) applyCommand(w, F, { c: 'designate', kind: 'chop', cells: trees });
+  }
   const r = w.research[F];
   if (!r.cur) { const next = Object.keys(RESEARCH).find(id => !r.done.includes(id) && canStartResearch(w, F, id)); if (next) applyCommand(w, F, { c: 'research', id: next }); }
 }

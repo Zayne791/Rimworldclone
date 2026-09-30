@@ -47,6 +47,7 @@ export function computeAlerts(g: Game): Alert[] {
   if (w.tick > 12000 && ![...w.zones.values()].some(z => z.faction === f && z.kind === 'grow') && !blds.some(b => BUILDINGS[b.def].growBasin)) out.push({ text: 'Grow food: make a growing zone', crit: false, tab: 'zones' });
   const meds = countResource(w, f, 'medicine') + countResource(w, f, 'medicine_herbal') + countResource(w, f, 'medicine_glitter');
   if (meds < 3 && w.day > 3) out.push({ text: 'Low medicine', crit: false });
+  if (blds.some(b => BUILDINGS[b.def].fuel?.item === 'wood') && countResource(w, f, 'wood') < 25) out.push({ text: 'Low wood · chop trees', crit: false, tab: 'orders' });
   const noFuel = blds.find(b => BUILDINGS[b.def].fuel && (b.fuel || 0) <= 0);
   if (noFuel) out.push({ text: `Out of fuel: ${BUILDINGS[noFuel.def].label}`, crit: false, x: noFuel.x, y: noFuel.y, id: noFuel.id });
   const unpowered = blds.find(b => BUILDINGS[b.def].power?.use && b.on !== false && !b.powered);

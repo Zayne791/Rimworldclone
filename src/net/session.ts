@@ -191,6 +191,10 @@ export class HostSession implements Session {
     const w = this.w;
     const things: any[] = [];
     const seen = new Set<number>();
+    // removals first: a thing despawned and re-registered under the same id this interval (item picked
+    // up and dropped, building re-placed) must go out as a full record, not a partial diff the client can't apply
+    const rm = w.removed; w.removed = [];
+    for (const id of rm) this.last.delete(id);
     const consider = (t: Thing, force = false) => {
       seen.add(t.id);
       const view = netView(w, t);
@@ -218,8 +222,6 @@ export class HostSession implements Session {
     this.rr = (this.rr + slice) % Math.max(1, rest.length);
     // doors & turrets change visually often: check every frame
     for (const b of w.buildings.values()) { const d = BUILDINGS[b.def]; if ((d.isDoor || d.turret || d.power || d.fuel || d.bench) && !seen.has(b.id)) consider(b); }
-    const rm = w.removed; w.removed = [];
-    for (const id of rm) this.last.delete(id);
     const tiles: number[][] = [];
     for (const i of w.map.dirty) tiles.push(w.map.tileRecord(i));
     w.map.dirty.clear();
@@ -346,6 +348,7 @@ export class ClientSession implements Session {
     let lights = false;
     for (const rec of d.th || []) {
       const old = w.things.get(rec.id);
+      if (!rec._n && !old) continue; // partial update for something we never saw: ignore rather than register half a thing
       if (rec._n || !old) {
         delete rec._n;
         if (old) w.despawn(old);

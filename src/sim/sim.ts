@@ -13,12 +13,16 @@ import { pawnShortName } from './things';
 import { setStatTick } from './stats';
 
 let turretCache: { v: number; ids: number[] } = { v: -1, ids: [] };
+let tickErrors = 0;
 
 export function simTick(w: World) {
   w.tick++;
   const t = w.tick;
   setStatTick(t);
-  for (const p of [...w.pawns.values()]) pawnTick(w, p);
+  for (const p of [...w.pawns.values()]) {
+    // one pawn's bad state must not stall the world: drop its job and move on (reported, not hidden)
+    try { pawnTick(w, p); } catch (e) { if (tickErrors++ < 10) console.error('pawn tick error', p.id, p.race, p.job?.type, e); p.job = null; p.queue = []; p.path = null; }
+  }
   for (const pr of [...w.projectiles.values()]) projectileTick(w, pr);
   const bv = w._cache.buildingsVersion || 0;
   if (turretCache.v !== bv) { turretCache = { v: bv, ids: [...w.buildings.values()].filter(b => BUILDINGS[b.def].turret).map(b => b.id) }; }

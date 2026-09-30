@@ -88,9 +88,11 @@ export class Game {
   start() {
     this.running = true;
     this.last = performance.now();
+    let errors = 0;
     const loop = (now: number) => {
       if (!this.running) return;
-      this.frame(now);
+      // keep the game alive through a bad frame (log the first few so bugs stay visible)
+      try { this.frame(now); } catch (e) { if (errors++ < 5) console.error('frame error', e); }
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
