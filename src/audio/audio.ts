@@ -83,20 +83,48 @@ export class AudioEngine {
   }
 
   // ---------- music ----------
+  /** 'calm' drifts through frontier chord progressions; 'danger' (raids, manhunters) switches to a tense pulse */
+  musicMood: 'calm' | 'danger' = 'calm';
+  private section = 0;
+  setMusicMood(m: 'calm' | 'danger') { this.musicMood = m; }
   startMusic() {
     if (!this.ctx || this.musicTimer) return;
-    const scale = [0, 3, 5, 7, 10, 12, 15];
-    const chords = [[57, 60, 64], [53, 57, 60], [55, 59, 62], [52, 55, 59]];
     const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
+    // chord roots + intervals (A minor-ish frontier palette, a hopeful major section, a wistful one)
+    const PROGS: number[][][] = [
+      [[57, 60, 64], [53, 57, 60], [55, 59, 62], [52, 55, 59]],
+      [[48, 52, 55], [55, 59, 62], [57, 60, 64], [53, 57, 60]],
+      [[50, 53, 57], [55, 58, 62], [48, 52, 55], [53, 57, 60]],
+      [[57, 60, 64], [55, 60, 64], [53, 57, 62], [52, 56, 59]],
+    ];
+    const PENTA = [0, 2, 4, 7, 9, 12, 14];
     const loop = () => {
       if (!this.ctx) return;
       const t = this.ctx.currentTime + 0.05;
-      const ch = chords[this.chordIdx++ % chords.length];
-      for (const n of ch) this.pad(t, midi(n - 12), 7.5, 0.05);
-      // sparse plucks
-      for (let k = 0; k < 4; k++) if (Math.random() < 0.65) {
-        const n = ch[0] + scale[Math.floor(Math.random() * scale.length)];
-        this.pluck(t + k * 1.8 + Math.random() * 0.4, midi(n), 0.06);
+      if (this.musicMood === 'danger') {
+        // low pulsing ostinato over a dark drone
+        const root = [45, 45, 46, 43][this.chordIdx++ % 4];
+        this.pad(t, midi(root - 12), 4.2, 0.05);
+        this.pad(t, midi(root - 5), 4.2, 0.03);
+        for (let k = 0; k < 8; k++) this.pluck(t + k * 0.5, midi(root + (k % 4 === 3 ? 3 : 0)), 0.045, 0.5);
+        if (Math.random() < 0.5) this.pluck(t + 3.5, midi(root + 15), 0.03, 1.2);
+        this.musicTimer = window.setTimeout(loop, 4000);
+        return;
+      }
+      if (this.chordIdx % 8 === 0) this.section = Math.floor(Math.random() * PROGS.length);
+      const ch = PROGS[this.section][this.chordIdx++ % 4];
+      for (const n of ch) this.pad(t, midi(n - 12), 7.5, 0.045);
+      this.pluck(t, midi(ch[0] - 24), 0.07, 3.5); // soft bass
+      if (Math.random() < 0.55) {
+        // a short melodic phrase on the pentatonic scale above the chord
+        let step = Math.floor(Math.random() * 3);
+        for (let k = 0; k < 5; k++) {
+          if (Math.random() < 0.25) continue;
+          step = Math.max(0, Math.min(PENTA.length - 1, step + (Math.random() < 0.5 ? -1 : 1)));
+          this.pluck(t + 0.9 + k * 1.1 + Math.random() * 0.15, midi(ch[0] + 12 + PENTA[step]), 0.05);
+        }
+      } else {
+        for (let k = 0; k < 4; k++) if (Math.random() < 0.6) this.pluck(t + k * 1.8 + Math.random() * 0.4, midi(ch[Math.floor(Math.random() * 3)] + 12), 0.05);
       }
       this.musicTimer = window.setTimeout(loop, 7200);
     };
@@ -113,14 +141,14 @@ export class AudioEngine {
       o.connect(lp); lp.connect(g); g.connect(this.music); o.start(t); o.stop(t + dur + 0.1);
     }
   }
-  pluck(t: number, f: number, vol: number) {
+  pluck(t: number, f: number, vol: number, len = 1.6) {
     const c = this.ctx!;
     const o = c.createOscillator(), g = c.createGain();
     o.type = 'triangle'; o.frequency.value = f;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
     const dl = c.createDelay(); dl.delayTime.value = 0.38; const fb = c.createGain(); fb.gain.value = 0.35;
     o.connect(g); g.connect(this.music); g.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(this.music);
-    o.start(t); o.stop(t + 1.7);
+    o.start(t); o.stop(t + len + 0.1);
   }
 }
 

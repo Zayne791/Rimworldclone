@@ -284,6 +284,21 @@ class OffsetPix {
   map(fn: any) { this.t.map((c, x, y) => fn(c, x, y - this.oy)); }
 }
 
+/** build-menu icon: an L-shaped run of wall so it can't be mistaken for a door or crate */
+export function wallIconSprite(stuff: string | undefined): Sprite {
+  const key = 'icon:' + (stuff || '');
+  let s = wallCache.get(key);
+  if (s) return s;
+  const st = stuffColor(stuff), k = stuffKind(stuff);
+  const p = new Pix(32, 32);
+  p.blit(wallPix(st, k, 2 | 4), 0, 0);
+  p.blit(wallPix(st, k, 8), 16, 0);
+  p.blit(wallPix(st, k, 1), 0, 16);
+  s = addSprite(p);
+  wallCache.set(key, s);
+  return s;
+}
+
 const wallCache = new Map<string, Sprite>();
 export function wallSprite(stuff: string | undefined, mask: number, dmg = 0): Sprite {
   const key = (stuff || '') + ':' + mask + ':' + dmg;

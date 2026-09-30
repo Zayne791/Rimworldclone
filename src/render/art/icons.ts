@@ -1,7 +1,7 @@
 // 16x16 pixel-art UI icons, exported as data URLs for DOM usage.
 import { Pix, C, ramp, addSprite, spriteToDataURL, type Col } from '../pixel';
 import { itemSprite } from './items';
-import { buildingSprite } from './buildings';
+import { buildingSprite, wallIconSprite } from './buildings';
 
 type Pal = Record<string, Col>;
 const K = '#1c1622';
@@ -69,7 +69,11 @@ export function iconURL(name: string, scale = 3): string {
     p.grid(rows, P, 0, oy);
     s = addSprite(p);
   } else if (name.startsWith('item:')) s = itemSprite(name.slice(5));
-  else if (name.startsWith('bld:')) { const [, id, stuff] = name.split(':'); s = buildingSprite(id, stuff || undefined, 0, { lit: true, powered: true, charge: 0.7 }); }
+  else if (name.startsWith('bld:')) {
+    const [, id, stuff] = name.split(':');
+    // walls are autotiled: show a short L-shaped run so the icon reads as "wall"
+    s = id === 'wall' ? wallIconSprite(stuff || undefined) : buildingSprite(id, stuff || undefined, 0, { lit: true, powered: true, charge: 0.7 });
+  }
   else { const p = new Pix(16, 16); p.rect(4, 4, 8, 8, C('#888')); s = addSprite(p); }
   u = spriteToDataURL(s, scale);
   urlCache.set(key, u);

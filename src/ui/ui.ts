@@ -138,7 +138,7 @@ export class UI {
     const hh = hour === 0 ? '12am' : hour < 12 ? hour + 'am' : hour === 12 ? '12pm' : hour - 12 + 'pm';
     const sun = hour >= 6 && hour < 19 ? '☀' : '☾';
     const waiting = g.net && eff < sp ? w.players.filter(p => p.connected && p.speed < sp).map(p => p.name).join(', ') : '';
-    const d1 = `${hh} · ${w.dateString()}`;
+    const d1 = `${hh} · ${window.innerWidth < 440 ? w.dateString().replace(/, \d+$/, '') : w.dateString()}`;
     const d2 = `${sun} ${wd.label} · ${t}°C${waiting ? ` · waiting: ${waiting}` : ''}`;
     const e1 = this.top.querySelector('.d1')!, e2 = this.top.querySelector('.d2')!;
     if (e1.textContent !== d1) e1.textContent = d1;
@@ -157,7 +157,9 @@ export class UI {
     // one-tap "draft everyone" while a threat is on the map (or anyone is drafted)
     const able = cols.filter(p => !p.downed && !p.mental);
     const anyDrafted = able.some(p => p.drafted);
-    const showDraft = able.length > 1 && (anyDrafted || threatActive(g));
+    const threat = threatActive(g);
+    g.audio.setMusicMood(threat ? 'danger' : 'calm');
+    const showDraft = able.length > 1 && (anyDrafted || threat);
     const keys = cols.map(p => p.id).join(',') + (showDraft ? '+d' : '');
     if (this.sig.colkeys !== keys) {
       this.sig.colkeys = keys; this.sig.col = '';
