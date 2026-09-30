@@ -47,7 +47,7 @@ add({ id: 'devilstrand', label: 'devilstrand', cat: 'textile', stack: 75, mass: 
   stuff: stuff({ color: '#a33a30', cats: ['fabric'], hpF: 1.3, beauty: 1, workF: 1, flam: 0.4, sharpF: 0.2, bluntF: 0.2, armorF: 1.1, insCold: 20 }), desc: 'Tough fungal fabric with excellent protection.' });
 add({ id: 'leather', label: 'leather', cat: 'textile', stack: 75, mass: 0.03, value: 2.1, sprite: 'leather', flam: 1,
   stuff: stuff({ color: '#8e5f3a', cats: ['leathery'], hpF: 1.3, beauty: 0, workF: 1, flam: 1, sharpF: 0.2, bluntF: 0.2, armorF: 0.7, insCold: 16 }), desc: 'Tanned animal hide.' });
-add({ id: 'wool', label: 'muffalo wool', cat: 'textile', stack: 75, mass: 0.028, value: 2.6, sprite: 'wool', flam: 1,
+add({ id: 'wool', label: 'wool', cat: 'textile', stack: 75, mass: 0.028, value: 2.6, sprite: 'wool', flam: 1,
   stuff: stuff({ color: '#eee7d3', cats: ['fabric'], hpF: 1, beauty: 0, workF: 1, flam: 1, sharpF: 0.2, bluntF: 0.2, armorF: 0.3, insCold: 30 }), desc: 'Thick, warm wool.' });
 add({ id: 'fur', label: 'thick fur', cat: 'textile', stack: 75, mass: 0.03, value: 3, sprite: 'fur', flam: 1,
   stuff: stuff({ color: '#6b5a48', cats: ['leathery'], hpF: 1.4, beauty: 1, workF: 1, flam: 1, sharpF: 0.2, bluntF: 0.2, armorF: 0.8, insCold: 30 }), desc: 'Heavy fur pelt from a large predator.' });

@@ -97,6 +97,10 @@ You can also point at your own PeerJS server with `VITE_PEER_HOST`, `VITE_PEER_P
 
 ## What's in the game
 
+This is the short version. **[FEATURES.md](FEATURES.md)** is the full guide: every building, item, weapon, research
+project, animal, crop, trait, backstory, thought and event with its stats, plus how each system works and what to try first.
+It is generated from the game data (`npx tsx dev/gen-features.ts`), so rerun that after changing content.
+
 - **Colonists** with skills, passions, traits, backstories, needs (food, rest, joy, comfort,
   beauty, temperature), moods, thoughts, relationships, social fights, inspirations and mental breaks.
 - **Health** by body part: cuts, bruises, gunshots, burns, bleeding, infections, diseases, frostbite,
@@ -104,7 +108,7 @@ You can also point at your own PeerJS server with `VITE_PEER_HOST`, `VITE_PEER_P
 - **Work priorities and schedules**: firefighting, doctoring, cooking, hunting, construction,
   growing, mining, crafting, art, hauling, cleaning, research.
 - **Building**: walls, doors, floors, furniture, beds, lighting, production benches, stoves, coolers,
-  heaters, power (generators, solar, geothermal, batteries, conduits), turrets, traps, sandbags,
+  heaters, power (wood-fired generators, solar, wind, geothermal, batteries, conduits), turrets, traps, sandbags,
   art and a ship reactor for the victory ending.
 - **Rooms**: automatic roofing, temperature per room, room stats (impressiveness, beauty,
   cleanliness), mountain bases with overhead rock.
