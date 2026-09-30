@@ -1,4 +1,5 @@
 // Main menu, new-game setup, colonist selection, landing site picker, load screen, multiplayer lobby screens.
+import { startDiorama, stopDiorama } from './diorama';
 import type { Pawn } from '../sim/types';
 import type { World } from '../sim/world';
 import { createWorld, addColony, generateStartingColonists, defaultSitePref } from '../sim/newgame';
@@ -27,8 +28,10 @@ export interface MenuHooks {
 const root = () => document.getElementById('screens')!;
 let hooks: MenuHooks;
 
-function screen(html: string) {
-  root().innerHTML = `<div class="screen">${html}</div>`;
+function screen(html: string, home = false) {
+  // the live colony diorama only runs behind the (translucent) title screen
+  if (home) startDiorama(document.getElementById('view') as HTMLCanvasElement); else stopDiorama();
+  root().innerHTML = `<div class="screen ${home ? 'home' : ''}">${html}</div>`;
 }
 const val = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.value ?? '';
 
@@ -36,26 +39,20 @@ const val = (id: string) => (document.getElementById(id) as HTMLInputElement | n
 let logoURL = '';
 function makeLogo(): string {
   if (logoURL) return logoURL;
-  const W = 220, H = 70;
+  const W = 220, H = 56;
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const ctx = c.getContext('2d')!;
   ctx.imageSmoothingEnabled = false;
-  // stars
-  const r = new Rng('logo');
-  for (let k = 0; k < 60; k++) { ctx.fillStyle = r.chance(0.2) ? '#f0c850' : '#c8c0e0'; ctx.fillRect(r.int(0, W), r.int(0, H - 20), 1, 1); }
-  // planet arc
-  ctx.fillStyle = '#3a6a3a'; ctx.beginPath(); ctx.ellipse(W / 2, H + 120, 190, 150, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#4e8a44'; ctx.beginPath(); ctx.ellipse(W / 2, H + 124, 186, 150, 0, 0, Math.PI * 2); ctx.fill();
   // falling pod trail
-  for (let k = 0; k < 26; k++) { ctx.fillStyle = k < 8 ? '#fff4b0' : k < 16 ? '#ff9030' : '#8a3a24'; ctx.fillRect(176 - k * 2, 8 + k, 2, 2); }
-  ctx.fillStyle = '#c8ccd4'; ctx.fillRect(176, 6, 5, 5); ctx.fillStyle = '#6a7580'; ctx.fillRect(177, 10, 4, 2);
-  // text
+  for (let k = 0; k < 26; k++) { ctx.fillStyle = k < 8 ? '#fff4b0' : k < 16 ? '#ff9030' : '#8a3a24'; ctx.fillRect(176 - k * 2, 6 + k, 2, 2); }
+  ctx.fillStyle = '#c8ccd4'; ctx.fillRect(176, 4, 5, 5); ctx.fillStyle = '#6a7580'; ctx.fillRect(177, 8, 4, 2);
+  // text with a solid dark outline so it reads over the live colony behind it
   ctx.font = '700 16px "Pixelify Sans", monospace';
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#1c1622';
-  ctx.fillText('STARFALL', W / 2 + 1, 30); ctx.fillText('COLONY', W / 2 + 1, 48);
-  ctx.fillStyle = '#f0c850'; ctx.fillText('STARFALL', W / 2, 29);
-  ctx.fillStyle = '#efe9dd'; ctx.fillText('COLONY', W / 2, 47);
+  ctx.fillStyle = '#120e18';
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1], [1, 2], [0, 2]]) { ctx.fillText('STARFALL', W / 2 + dx, 27 + dy); ctx.fillText('COLONY', W / 2 + dx, 45 + dy); }
+  ctx.fillStyle = '#f0c850'; ctx.fillText('STARFALL', W / 2, 27);
+  ctx.fillStyle = '#efe9dd'; ctx.fillText('COLONY', W / 2, 45);
   // threshold alpha to crisp pixels
   const img = ctx.getImageData(0, 0, W, H);
   for (let i = 3; i < img.data.length; i += 4) img.data[i] = img.data[i] > 100 ? 255 : 0;
@@ -85,7 +82,7 @@ export async function showMainMenu(h: MenuHooks) {
       <button class="btn" data-m="help">How to play</button>
     </div>
     <div class="tiny faint" style="margin-top:18px;max-width:420px;text-align:center">Tip: on iPad/iPhone use Share → "Add to Home Screen" for full-screen play.</div>
-    <input type="file" id="importfile" accept=".sfsave,application/octet-stream" style="display:none">`);
+    <input type="file" id="importfile" accept=".sfsave,application/octet-stream" style="display:none">`, true);
   bind({
     continue: async () => { const w = await loadFromDb(saves[0].name); if (w) startLoaded(w); },
     new: () => newGameScreen(false),
@@ -290,5 +287,5 @@ export function statusScreen(title: string, msg: string, back?: () => void) {
   screen(`<h2>${escapeHtml(title)}</h2><div class="card px"><div>${msg}</div></div>${back ? '<div class="menu"><button class="btn" data-m="back">Back</button></div>' : ''}`);
   if (back) bind({ back });
 }
-export function clearScreens() { root().innerHTML = ''; root().onclick = null; }
+export function clearScreens() { stopDiorama(); root().innerHTML = ''; root().onclick = null; }
 export { PLAYER_COLORS, iconImg };

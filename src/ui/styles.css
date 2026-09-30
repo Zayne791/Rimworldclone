@@ -252,3 +252,8 @@ input[type=range]::-webkit-slider-runnable-track { height: 10px; background: #0e
 input[type=range]::-moz-range-track { height: 10px; background: #0e0c14; border: 2px solid var(--line); }
 input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 26px; margin-top: -10px; background: var(--accent); border: 2px solid #1a1420; box-shadow: inset 0 2px 0 rgba(255,255,255,0.35), inset 0 -3px 0 rgba(0,0,0,0.3); border-radius: 0; }
 input[type=range]::-moz-range-thumb { width: 18px; height: 24px; background: var(--accent); border: 2px solid #1a1420; border-radius: 0; }
+
+/* ---------- title screen over the live diorama ---------- */
+.screen.home { justify-content: center; background: linear-gradient(180deg, rgba(16,13,22,0.92) 0%, rgba(16,13,22,0.55) 30%, rgba(16,13,22,0.35) 55%, rgba(16,13,22,0.9) 100%); }
+.screen.home .menu { background: rgba(16,13,22,0.55); padding: 12px; box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 1px var(--line); }
+.screen.home .logo { filter: drop-shadow(0 3px 0 rgba(0,0,0,0.6)); }
