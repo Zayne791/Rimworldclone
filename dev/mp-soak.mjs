@@ -2,10 +2,10 @@
 import { chromium, devices } from 'playwright';
 const Q = process.argv[2] || 'peerhost=127.0.0.1&peerport=9000&peerpath=/&peersecure=false';
 const secs = +(process.argv[3] || 60);
-const base = 'http://127.0.0.1:5173/?' + Q;
+const base = (process.env.BASE || 'http://127.0.0.1:5173/') + '?' + Q;
 const b = await chromium.launch({ args: ['--disable-features=WebRtcHideLocalIpsWithMdns'] });
 const errs = [];
-const mk = async (dev, tag) => { const c = await b.newContext({ ...devices[dev] }); const p = await c.newPage(); p.on('pageerror', e => errs.push(tag + ' pageerror: ' + e.message + ' ' + e.stack)); p.on('console', m => { if (m.type() === 'error') errs.push(tag + ' console: ' + m.text()); }); return p; };
+const mk = async (dev, tag) => { const c = await b.newContext({ ...devices[dev] }); const p = await c.newPage(); p.on('pageerror', e => errs.push(tag + ' pageerror: ' + e.message + ' ' + e.stack)); p.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errs.push(tag + ' console: ' + m.text()); }); p.on('framenavigated', f => { if (f === p.mainFrame()) errs.push(tag + ' navigated ' + f.url()); }); p.on('crash', () => errs.push(tag + ' CRASHED')); return p; };
 const A = await mk('iPad Pro 11', 'A');
 await A.goto(base);
 await A.waitForSelector('[data-m="host"]'); await A.tap('[data-m="host"]');
@@ -44,7 +44,8 @@ const snap = () => {
   let tiles = 0; for (let i = 0; i < m.n; i++) tiles = (tiles * 31 + m.plant[i] * 7 + m.rock[i] * 13 + m.floor[i] * 17 + m.zone[i] * 19 + m.desig[i] * 23 + m.roof[i] * 29) >>> 0;
   return { tick: w.tick, pawns, items, blds, bps, zones: [...w.zones.values()].map(z => z.id + ':' + z.cells.length).sort(), tiles, letters: w.letters.length, day: w.day };
 };
-const [sa, sb] = [await A.evaluate(snap), await B.evaluate(snap)];
+let sa, sb;
+try { [sa, sb] = [await A.evaluate(snap), await B.evaluate(snap)]; } catch (e) { console.log('snapshot failed', e.message); console.log(errs.join('\n')); await b.close(); process.exit(1); }
 const diff = (name, x, y) => { const ks = new Set([...Object.keys(x), ...Object.keys(y)]); const bad = []; for (const k of ks) if (JSON.stringify(x[k]) !== JSON.stringify(y[k])) bad.push(`${k}: host ${JSON.stringify(x[k])} client ${JSON.stringify(y[k])}`); console.log(`${name}: ${Object.keys(x).length} host / ${Object.keys(y).length} client, mismatches ${bad.length}`); for (const l of bad.slice(0, 6)) console.log('   ', l); };
 console.log('tick host', sa.tick, 'client', sb.tick, 'day', sa.day, 'letters', sa.letters, sb.letters);
 diff('pawns', sa.pawns, sb.pawns); diff('items', sa.items, sb.items); diff('buildings', sa.blds, sb.blds); diff('blueprints', sa.bps, sb.bps);
