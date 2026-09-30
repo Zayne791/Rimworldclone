@@ -19,7 +19,7 @@ import { iconURL } from './art/icons';
 
 export interface Camera { x: number; y: number; zoom: number }
 export interface Overlay { drawWorld?(ctx: CanvasRenderingContext2D, r: Renderer): void; drawScreen?(ctx: CanvasRenderingContext2D, r: Renderer): void }
-export interface ViewOpts { faction: number; selection: Set<number>; overlay?: Overlay | null; zones: boolean; roofs: boolean; home: boolean; temps: boolean; beauty?: boolean; labels: boolean }
+export interface ViewOpts { faction: number; selection: Set<number>; overlay?: Overlay | null; zones: boolean; roofs: boolean; home: boolean; temps: boolean; beauty?: boolean; labels: boolean; thinking?: (id: number) => boolean }
 
 interface Particle { x: number; y: number; vx: number; vy: number; t: number; life: number; kind: string; c?: string; s?: string; size?: number }
 
@@ -271,6 +271,7 @@ export class Renderer {
     this.drawWeather(ctx, dt);
     this.drawTexts(ctx, dt);
     if (this.opts.labels) this.drawLabels(ctx);
+    this.drawSpeech(ctx);
     this.opts.overlay?.drawScreen?.(ctx, this);
     if (this.flash > 0) { ctx.fillStyle = `rgba(230,240,255,${this.flash * 0.6})`; ctx.fillRect(0, 0, this.vw, this.vh); this.flash = Math.max(0, this.flash - dt * 3); }
   }
@@ -718,6 +719,54 @@ export class Renderer {
       ctx.fillText(name, sx * this.dpr, sy * this.dpr);
     }
     ctx.textAlign = 'left';
+  }
+
+  /** AI-mind speech bubbles (and a thinking cloud while the model decides), in screen space so they stay readable */
+  drawSpeech(ctx: CanvasRenderingContext2D) {
+    const w = this.w, d = this.dpr;
+    const fs = Math.round(11.5 * d), lh = Math.round(fs * 1.22), maxW = 170 * d, pad = 5 * d;
+    ctx.font = `600 ${fs}px ${UI_FONT}`;
+    ctx.textBaseline = 'alphabetic';
+    for (const p of w.pawns.values()) {
+      if (p.race !== 'human' || p.dead) continue;
+      const talking = p.speech && p.speech.t > w.tick;
+      const thinking = !talking && this.opts.thinking?.(p.id);
+      if (!talking && !thinking) continue;
+      const pos = this.pawnDraw.get(p.id);
+      const [wx, wy] = pos && w.mode === 'client' ? [pos.x, pos.y] : this.pawnPos(p);
+      const [sx, sy] = this.worldToScreen(wx + 8, wy - 12);
+      const X = sx * d, Y = sy * d;
+      if (X < -maxW || Y < -80 * d || X > this.vw + maxW || Y > this.vh + 40 * d) continue;
+      if (thinking) {
+        const t = this.time * 3 + p.id;
+        ctx.fillStyle = 'rgba(244,240,232,0.9)';
+        for (let k = 0; k < 3; k++) { const r = (2 + k * 1.2) * d; ctx.beginPath(); ctx.arc(X + (k * 6 - 2) * d, Y - k * 6 * d - Math.sin(t + k) * d, r, 0, Math.PI * 2); ctx.fill(); }
+        continue;
+      }
+      // word wrap into at most three lines
+      const words = p.speech!.text.split(' ');
+      const lines: string[] = [];
+      let cur = '';
+      for (const wd of words) {
+        const next = cur ? cur + ' ' + wd : wd;
+        if (ctx.measureText(next).width > maxW && cur) { lines.push(cur); cur = wd; if (lines.length === 3) break; } else cur = next;
+      }
+      if (lines.length < 3 && cur) lines.push(cur);
+      else if (cur && lines.length === 3) lines[2] = lines[2].replace(/.?$/, '…');
+      const bw = Math.max(...lines.map(l => ctx.measureText(l).width)) + pad * 2, bh = lines.length * lh + pad * 1.4;
+      const bx = Math.round(X - bw / 2), by = Math.round(Y - bh - 6 * d);
+      const left = (p.speech!.t - w.tick) / 60;
+      ctx.globalAlpha = Math.min(1, left * 1.5);
+      ctx.fillStyle = 'rgba(12,10,16,0.55)';
+      ctx.fillRect(bx + 2 * d, by + 2 * d, bw, bh);
+      ctx.fillStyle = p.faction === this.opts.faction ? '#f4f0e8' : '#dce8ff';
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.beginPath(); ctx.moveTo(X - 4 * d, by + bh); ctx.lineTo(X + 3 * d, by + bh); ctx.lineTo(X - 1 * d, by + bh + 6 * d); ctx.fill();
+      ctx.fillStyle = '#1c1622';
+      ctx.textAlign = 'left';
+      lines.forEach((l, k) => ctx.fillText(l, bx + pad, by + pad * 0.7 + (k + 1) * lh - lh * 0.22));
+      ctx.globalAlpha = 1;
+    }
   }
 
   drawSelection(ctx: CanvasRenderingContext2D) {

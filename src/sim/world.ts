@@ -31,6 +31,7 @@ export interface PlayerInfo {
   isHost?: boolean;
   startX?: number; startY?: number;
   ping?: number;
+  minds?: boolean;       // colonists are driven by language-model minds
 }
 
 export interface ResearchState { cur: string | null; prog: Record<string, number>; done: string[]; queue?: string[] }
@@ -75,7 +76,9 @@ export class World {
   removed: number[] = [];      // ids removed this net frame (host)
   nextZoneId = 1;
   gameOver = false;
-  chat: { from: string; text: string; tick: number; color: string }[] = [];
+  chat: { from: string; text: string; tick: number; color: string; n?: number }[] = [];
+  seq = 0;   // sequence counter for chat & talk lines (replication)
+  talk: import('./minds').TalkLine[] = [];
   history: { tick: number; wealth: Record<number, number>; pop: Record<number, number> }[] = [];
   // Transient caches (not saved)
   _cache: Record<string, any> = {};
@@ -303,6 +306,16 @@ export class World {
     this.letters.push(l);
     if (this.letters.length > 120) this.letters.splice(0, this.letters.length - 120);
     this.fx.push({ k: 'letter', x: x ?? -1, y: y ?? -1, s: title, f: faction, id: l.id });
+    // AI minds hear the news too (threats and deaths call for a fresh decision)
+    const news = `News: ${title}. ${text.split('\n')[0].slice(0, 140)}`;
+    const urgent = kind === 'threat' || kind === 'death';
+    for (const p of this.pawns.values()) {
+      const m = p.mind;
+      if (!m?.on || p.dead || (faction && p.faction !== faction) || !this.isColonist(p)) continue;
+      m.inbox.push({ t: this.tick, text: news });
+      if (m.inbox.length > 12) m.inbox.splice(0, m.inbox.length - 12);
+      if (urgent && !m.want && this.tick - m.last > 240) { m.want = this.tick; m.why = title; }
+    }
     return l;
   }
 

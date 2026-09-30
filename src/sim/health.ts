@@ -13,6 +13,7 @@ import { addThought, addThoughtToAll } from './mood';
 import { ambientTemp } from './rooms';
 import { explode } from './combat';
 import { fx, fxw } from './techfx';
+import { mindEvent, mindEventAll } from './minds';
 import { besideBed, bedUnder } from './auras';
 import { roomAt } from './rooms';
 
@@ -74,6 +75,10 @@ export function applyDamage(w: World, p: Pawn, di: DamageInfo): number {
   if (!isMech(p) && armorKind(type) === 'sharp' && w.rng.chance(0.7)) w.map.addFilth(p.x, p.y, FILTH.blood, 30);
   if (isMech(p)) w.emit({ k: 'spark', x: p.x, y: p.y });
   w.text(p.x, p.y - 0.6, String(Math.round(amount)), '#ff6060');
+  if (p.mind?.on && w.tick - (p.lastHit || 0) > 300) {
+    const src = di.instigator ? w.pawns.get(di.instigator) : null;
+    mindEvent(w, p, `You were hurt: ${Math.round(amount)} ${type} damage to your ${part.label}${src ? ` from ${src.race === 'human' ? pawnShortName(src) : 'a ' + src.race}` : ''}.`, true);
+  }
   p.lastHit = w.tick;
   if (!p.dead) checkDowned(w, p);
   // revenge from animals

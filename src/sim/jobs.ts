@@ -15,7 +15,8 @@ import { fxw } from './techfx';
 import { workshopBonus, besideBed } from './auras';
 import { gainXp, fireAt, meleeAttack, pawnHostileTo, hitChance } from './combat';
 import { tend, die, setDowned, needsTending, applyDamage } from './health';
-import { addThought, changeOpinion } from './mood';
+import { addThought, changeOpinion, socialAct } from './mood';
+import { speak as speakTo, mindEvent as mindHeard } from './minds';
 import { roomAt, impressLabel } from './rooms';
 import { lineOfSight, bfsNearest } from './path';
 import { dist, dist2 } from '../core/util';
@@ -70,6 +71,42 @@ def('goto', {
     const [x, y] = cellXY(w, j.c!);
     const r = moveTo(w, p, x, y);
     return r === 'arrived' ? 'done' : r === 'fail' ? 'fail' : 'ongoing';
+  },
+});
+// AI minds: walk over to someone and say what the model chose
+def('talk', {
+  label: (w, p, j) => { const o = thing<Pawn>(w, j.t); return o ? `talking to ${pawnShortName(o)}` : 'talking'; },
+  tick(w, p, j) {
+    const o = thing<Pawn>(w, j.t);
+    if (!o || o.dead) return 'fail';
+    if (j.s === 0) {
+      const d = dist(p.x, p.y, o.x, o.y);
+      if (d <= 2.2 && lineOfSight(w, p.x, p.y, o.x, o.y)) { j.s = 1; j.w = 0; stopMoving(p); }
+      else {
+        // chase a moving target: re-aim at their current cell every so often
+        if (!j.data.aim || w.tick % 90 === 0) { j.data.aim = [o.x, o.y]; }
+        const r = moveTo(w, p, j.data.aim[0], j.data.aim[1], true);
+        if (r === 'fail') return 'fail';
+        if (r === 'arrived') j.data.aim = null;
+        return 'ongoing';
+      }
+    }
+    p.rot = faceTo(p, o);
+    if (j.w === 0) {
+      const tone = j.data?.tone || 'friendly';
+      if (!o.asleep && !o.downed && !o.drafted) o.rot = faceTo(o, p);
+      if (j.data?.say) speakTo(w, p, j.data.say, o, tone);
+      const outcome = o.asleep ? 'they were asleep' : socialAct(w, p, o, tone);
+      if (p.mind) mindHeard(w, p, `You spoke to ${pawnShortName(o)} (${tone}): ${outcome}.`);
+      if (o.mind && !o.asleep) {
+        // conversations wind down: after a few exchanges between the same two people nobody has to answer
+        const turns = w.talk.filter(l => l.kind === 'say' && w.tick - l.t < 2500 && ((l.from === p.id && l.to === o.id) || (l.from === o.id && l.to === p.id))).length;
+        const open = turns < 3;
+        mindHeard(w, o, `${pawnShortName(p)} came up to you (${tone})${j.data?.say ? ` and said: "${j.data.say}"` : ''}.${open ? ' Reply if you want, or carry on.' : ' The conversation has run its course.'}`, open);
+      }
+    }
+    j.w++;
+    return j.w > 150 ? 'done' : 'ongoing';
   },
 });
 def('wait', {

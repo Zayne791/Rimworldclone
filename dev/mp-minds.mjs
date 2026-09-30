@@ -1,0 +1,34 @@
+// Multiplayer AI minds: the client's colonists are run by the client's own mind controller
+// (offline mind here) and their decisions travel to the host as commands.
+import { chromium, devices } from 'playwright';
+const Q = process.argv[2] || 'relay=ws://127.0.0.1:8787/relay';
+const base = (process.env.BASE || 'http://127.0.0.1:5173/') + '?' + Q;
+const b = await chromium.launch({ args: ['--disable-features=WebRtcHideLocalIpsWithMdns'] });
+const errs = [];
+const mk = async (dev, tag) => { const c = await b.newContext({ ...devices[dev] }); const p = await c.newPage(); p.on('pageerror', e => errs.push(tag + ' pageerror: ' + e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(tag + ' console: ' + m.text()); }); return p; };
+const A = await mk('iPad Pro 11', 'A');
+await A.goto(base);
+await A.waitForSelector('[data-m="host"]'); await A.tap('[data-m="host"]');
+await A.waitForSelector('[data-m="next"]'); await A.tap('[data-m="next"]');
+await A.waitForSelector('[data-m="site"]', { timeout: 30000 }); await A.tap('[data-m="site"]');
+await A.waitForSelector('[data-m="go"]'); await A.tap('[data-m="go"]');
+await A.waitForFunction(() => window.__game?.net?.roomCode, null, { timeout: 30000 });
+const code = await A.evaluate(() => window.__game.net.roomCode);
+const B = await mk('iPhone 13', 'B');
+await B.goto(base + '&join=' + code);
+await B.waitForSelector('[data-m="go"]'); await B.tap('[data-m="go"]');
+await B.waitForSelector('[data-m="site"]', { timeout: 40000 }); await B.tap('[data-m="site"]');
+await B.waitForSelector('[data-m="go"]'); await B.tap('[data-m="go"]');
+await B.waitForFunction(() => window.__game && window.__game.world.colonists(window.__game.faction).length > 0, null, { timeout: 30000 });
+await B.evaluate(() => { const g = window.__game; g.minds.settings.provider = 'offline'; g.minds.save(); g.cmd({ c: 'minds', on: true }); });
+await A.evaluate(() => { window.__game.mySpeed = 2; }); await B.evaluate(() => { window.__game.mySpeed = 2; });
+await B.waitForTimeout(20000);
+const host = await A.evaluate(() => { const g = window.__game, w = g.world; const f = w.players.find(p => !p.isHost).faction; const cols = w.colonists(f); return { minds: cols.map(p => ({ n: p.mind?.n, goal: p.mind?.goal?.label })), lines: w.talk.filter(l => w.pawns.get(l.from)?.faction === f).length, hostMinds: w.colonists(g.faction).some(p => p.mind) }; });
+const client = await B.evaluate(() => { const g = window.__game, w = g.world; return { calls: g.minds.stats.calls, lines: w.talk.length, speech: w.colonists(g.faction).filter(p => p.speech).length }; });
+console.log('host view', JSON.stringify(host));
+console.log('client', JSON.stringify(client));
+const okAll = host.minds.every(m => m.n > 0) && host.lines > 0 && client.lines > 0 && !host.hostMinds;
+console.log(okAll ? 'mp minds ok' : 'MP MINDS FAIL');
+console.log(errs.slice(0, 10).join('\n') || 'no errors');
+await b.close();
+process.exit(okAll ? 0 : 1);

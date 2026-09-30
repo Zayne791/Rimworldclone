@@ -232,6 +232,8 @@ export interface Pawn {
   desig?: string;
   carriedBy?: number;
   shield?: number;        // shield belt energy
+  mind?: import('./minds').Mind;   // language-model mind (AI minds mode)
+  speech?: { text: string; t: number; to?: number };
   shieldT?: number;       // tick the shield last broke (recharge delay)
 }
 

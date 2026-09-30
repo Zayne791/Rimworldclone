@@ -349,3 +349,17 @@ input[type=range]::-moz-range-thumb { width: 18px; height: 24px; background: var
 .screen.home { justify-content: center; background: linear-gradient(180deg, rgba(16,13,22,0.92) 0%, rgba(16,13,22,0.55) 30%, rgba(16,13,22,0.35) 55%, rgba(16,13,22,0.9) 100%); }
 .screen.home .menu { background: rgba(16,13,22,0.55); padding: 12px; box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 1px var(--line); }
 .screen.home .logo { filter: drop-shadow(0 3px 0 rgba(0,0,0,0.6)); }
+
+/* ---------------- AI minds ---------------- */
+.mind-thought { font-style: italic; color: #d8cfff; margin: 4px 0 2px; padding-left: 8px; border-left: 2px solid #8a70d0; }
+.mind-now { min-height: 2px; font-size: 12px; }
+.voices { display: flex; flex-direction: column; gap: 4px; }
+.talk { font-size: 13px; line-height: 1.35; padding: 3px 0; border-bottom: 1px solid #2a2432; }
+.talk.inner { color: #b8b0d8; font-size: 12.5px; }
+.talk .tone { font-size: 10.5px; font-weight: 700; padding: 0 4px; background: #3a3448; color: #e8e0f8; text-transform: uppercase; letter-spacing: 0.5px; }
+.talk .tone.insult, .talk .tone.argue { background: #6a2a2a; }
+.talk .tone.flirt { background: #7a2a5a; }
+.talk .tone.comfort, .talk .tone.praise, .talk .tone.apologize { background: #2a5a3a; }
+.talk .tone.joke { background: #6a5a2a; }
+.seg.col { display: flex; flex-direction: column; gap: 4px; }
+.seg.col .btn { text-align: left; }

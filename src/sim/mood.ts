@@ -330,3 +330,58 @@ function interact(w: World, a: Pawn, b: Pawn) {
   if (b.rel[a.id] && b.rel[a.id].op > 60 && !b.rel[a.id].kind) b.rel[a.id].kind = 'friend';
   if (a.rel[b.id] && a.rel[b.id].op < -40 && !a.rel[b.id].kind) a.rel[b.id].kind = 'rival';
 }
+
+/** a chosen social act between two people (AI minds). Returns a short outcome for their memories. */
+export function socialAct(w: World, a: Pawn, b: Pawn, tone: string): string {
+  a.lastSocial = w.tick; b.lastSocial = w.tick;
+  const f = socialImpact(a);
+  const opB = b.rel[a.id]?.op || 0;
+  const icon = (i: string) => { a.bubble = { icon: i, t: w.tick + 240 }; };
+  switch (tone) {
+    case 'insult': {
+      icon('insult'); addThought(w, b, 'insulted', a.id); changeOpinion(a, b.id, -2);
+      if (opB < -30 && !b.guest && w.rng.chance(0.3)) {
+        w.text(a.x, a.y - 1, 'social fight!', '#ff5050');
+        applyDamage(w, a, { amount: w.rng.range(2, 6), type: 'blunt', instigator: b.id });
+        applyDamage(w, b, { amount: w.rng.range(2, 6), type: 'blunt', instigator: a.id });
+        addThought(w, a, 'harmed_in_fight', b.id); addThought(w, b, 'harmed_in_fight', a.id);
+        return 'it turned into a fistfight';
+      }
+      return 'they were hurt by it';
+    }
+    case 'argue': icon('insult'); addThought(w, a, 'argued', b.id); addThought(w, b, 'argued', a.id); return 'you argued';
+    case 'flirt': {
+      icon('heart');
+      const taken = (p: Pawn) => Object.entries(p.rel).some(([id, x]) => (x.kind === 'lover' || x.kind === 'spouse') && +id !== (p === a ? b.id : a.id));
+      const already = a.rel[b.id]?.kind === 'lover' || a.rel[b.id]?.kind === 'spouse';
+      if (already) { addThought(w, a, 'deep_talk', b.id); addThought(w, b, 'deep_talk', a.id); changeOpinion(b, a.id, 2 * f); return 'your lover smiled back'; }
+      if (taken(a) || taken(b) || b.guest || a.age < 18 || b.age < 18) { addThought(w, a, 'rebuffed', b.id); return 'they turned you down'; }
+      if (opB > 15 && w.rng.chance(0.35 + opB / 150)) {
+        a.rel[b.id] = { op: Math.max(a.rel[b.id]?.op || 0, 50), kind: 'lover' };
+        b.rel[a.id] = { op: Math.max(opB, 50), kind: 'lover' };
+        addThought(w, a, 'got_together'); addThought(w, b, 'got_together');
+        w.letter(a.faction, 'New lovers', `${pawnShortName(a)} and ${pawnShortName(b)} have become lovers!`, 'good', a.x, a.y, a.id);
+        return 'they said yes — you are now lovers';
+      }
+      addThought(w, a, 'rebuffed', b.id);
+      return 'they turned you down';
+    }
+    case 'comfort': icon('chat'); addThought(w, b, b.needs.mood < 0.45 ? 'comforted' : 'nice_chat', a.id); changeOpinion(a, b.id, 2); return b.needs.mood < 0.45 ? 'they seemed grateful' : 'they were fine anyway';
+    case 'praise': icon('chat'); addThought(w, b, 'praised', a.id); return 'they appreciated it';
+    case 'apologize': {
+      icon('chat');
+      const before = b.thoughts.length;
+      b.thoughts = b.thoughts.filter(t => !(t.o === a.id && (t.id === 'insulted' || t.id === 'argued' || t.id === 'harmed_in_fight')));
+      addThought(w, b, 'got_apology', a.id);
+      return b.thoughts.length < before + 1 ? 'they forgave you' : 'they accepted it';
+    }
+    case 'joke': {
+      icon('chat');
+      const lands = !b.traits.includes('abrasive') && w.rng.chance(0.75 + (opB > 0 ? 0.15 : -0.2));
+      if (lands) { addThought(w, a, 'shared_joke', b.id); addThought(w, b, 'shared_joke', a.id); b.needs.joy = Math.min(1, b.needs.joy + 0.04); a.needs.joy = Math.min(1, a.needs.joy + 0.03); return 'they laughed'; }
+      return 'the joke fell flat';
+    }
+    case 'deep': icon('deep'); addThought(w, a, 'deep_talk', b.id); addThought(w, b, 'deep_talk', a.id); changeOpinion(b, a.id, f); return 'a real conversation';
+    default: icon('chat'); addThought(w, a, 'nice_chat', b.id); addThought(w, b, 'nice_chat', a.id); changeOpinion(b, a.id, f * 0.5); return 'a pleasant chat';
+  }
+}

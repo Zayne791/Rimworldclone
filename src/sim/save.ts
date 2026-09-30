@@ -12,7 +12,7 @@ export function serializeWorld(w: World): any {
   return JSON.parse(JSON.stringify({
     v: VERSION, seed: w.seed, tick: w.tick, rng: w.rng.state(), settings: w.settings, nextId: w.nextId, nextZoneId: w.nextZoneId,
     map: w.map.toJSON(), things, zones: [...w.zones.values()], lords: [...w.lords.values()], factions: w.factions, players: w.players,
-    research: w.research, story: w.story, diplomacy: w.diplomacy, letters: w.letters, conditions: w.conditions, weather: w.weather,
+    research: w.research, story: w.story, diplomacy: w.diplomacy, letters: w.letters, conditions: w.conditions, weather: w.weather, talk: w.talk, seq: w.seq,
     outdoorTemp: w.outdoorTemp, chat: w.chat, history: w.history, orbital: (w as any).orbital || {}, p2p: (w as any).p2p || [], diploOffers: (w as any).diploOffers || [],
     speed: w.speed, paused: w.paused,
   }, strip));
@@ -26,7 +26,7 @@ export function deserializeWorld(d: any, mode: 'host' | 'client' = 'host'): Worl
   w.map = m;
   m.bldInfo = bi;
   w.tick = d.tick; w.rng.setState(d.rng); w.nextId = d.nextId; w.nextZoneId = d.nextZoneId || 1;
-  w.factions = d.factions; w.players = d.players; w.research = d.research; w.story = d.story; w.diplomacy = d.diplomacy || {};
+  w.factions = d.factions; w.players = d.players; w.research = d.research; w.story = d.story; w.diplomacy = d.diplomacy || {}; w.talk = d.talk || []; w.seq = d.seq || 0;
   w.letters = d.letters || []; w.conditions = d.conditions || []; w.weather = d.weather; w.outdoorTemp = d.outdoorTemp ?? 15;
   w.chat = d.chat || []; w.history = d.history || [];
   (w as any).orbital = d.orbital || {}; (w as any).p2p = d.p2p || []; (w as any).diploOffers = d.diploOffers || [];

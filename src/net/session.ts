@@ -61,7 +61,7 @@ export class HostSession implements Session {
   game?: Game;
   last = new Map<number, Record<string, string>>();
   lastGlobals: Record<string, string> = {};
-  lastLetter = 0; lastChat = 0;
+  lastLetter = 0; lastChat = 0; lastTalk = 0;
   pendingFx: FxEvent[] = [];
   lastNet = 0;
   rr = 0;
@@ -88,7 +88,8 @@ export class HostSession implements Session {
   primeBaseline() {
     for (const t of this.w.things.values()) this.last.set(t.id, this.fieldStrings(netView(this.w, t)));
     this.lastLetter = this.w.letters.length ? this.w.letters[this.w.letters.length - 1].id : 0;
-    this.lastChat = this.w.chat.length;
+    this.lastChat = this.w.chat.length ? this.w.chat[this.w.chat.length - 1].n || 0 : 0;
+    this.lastTalk = this.w.talk.length ? this.w.talk[this.w.talk.length - 1].n || 0 : 0;
     this.w.map.dirty.clear();
     this.w.removed = [];
     this.lastGlobals = {};
@@ -250,7 +251,11 @@ export class HostSession implements Session {
     // letters & chat as appends
     const newL = w.letters.filter(l => l.id > this.lastLetter);
     if (newL.length) { out.letters = newL; this.lastLetter = newL[newL.length - 1].id; }
-    if (w.chat.length !== this.lastChat) { out.chat = w.chat.slice(Math.max(0, this.lastChat)); this.lastChat = w.chat.length; if (out.chat.length > 50) out.chat = out.chat.slice(-50); }
+    // sequence numbers, not lengths: both logs are capped, so their length stops changing once full
+    const newC = w.chat.filter(c => (c.n || 0) > this.lastChat);
+    if (newC.length) { out.chat = newC.slice(-50); this.lastChat = newC[newC.length - 1].n || this.lastChat; }
+    const newT = w.talk.filter(l => (l.n || 0) > this.lastTalk);
+    if (newT.length) { out.talk = newT.slice(-60); this.lastTalk = newT[newT.length - 1].n || this.lastTalk; }
     return out;
   }
 
@@ -396,7 +401,8 @@ export class ClientSession implements Session {
     if (g.history) w.history = g.history;
     if (g.settings) w.settings = g.settings;
     if (g.letters) { for (const l of g.letters) if (!w.letters.some(x => x.id === l.id)) w.letters.push(l); if (w.letters.length > 150) w.letters.splice(0, w.letters.length - 150); }
-    if (g.chat) { for (const c of g.chat) { w.chat.push(c); this.game?.audio.play('chat'); } if (w.chat.length > 100) w.chat.splice(0, w.chat.length - 100); }
+    if (g.chat) { for (const c of g.chat) { if (w.chat.some(x => x.n && x.n === c.n)) continue; w.chat.push(c); this.game?.audio.play('chat'); } if (w.chat.length > 100) w.chat.splice(0, w.chat.length - 100); }
+    if (g.talk) { const top = w.talk.length ? w.talk[w.talk.length - 1].n || 0 : 0; for (const l of g.talk) if ((l.n || 0) > top) w.talk.push(l); if (w.talk.length > 120) w.talk.splice(0, w.talk.length - 120); }
     if (g.rooms) {
       ensureRooms(w);
       for (const [cell, temp] of g.rooms) { const id = m.roomId[cell]; if (id && w.rooms[id - 1]) w.rooms[id - 1].temp = temp; }

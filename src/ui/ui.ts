@@ -68,7 +68,11 @@ export class UI {
     this.root.addEventListener('click', e => this.onClick(e));
     this.root.addEventListener('input', e => this.onInput(e));
     this.root.addEventListener('change', e => this.onInput(e));
-    document.getElementById('screens')!.addEventListener('click', e => this.onClick(e));
+    const screens = document.getElementById('screens')!;
+    screens.addEventListener('click', e => this.onClick(e));
+    // modals live in #screens: their sliders and text fields need the same input handling
+    screens.addEventListener('input', e => this.onInput(e));
+    screens.addEventListener('change', e => this.onInput(e));
     // stop map gestures from starting under HUD elements
     for (const ev of ['pointerdown', 'wheel']) this.root.addEventListener(ev, e => { if (e.target !== this.root) e.stopPropagation(); }, { passive: true });
   }

@@ -1,4 +1,5 @@
 // Per-pawn tick and the "think tree" that picks what each pawn does next.
+import { mindThink, mindTick, mindEvent, newMind } from './minds';
 import type { World } from './world';
 import type { Pawn, Job, Building } from './types';
 import { DRIVERS, mkJob, dropCarry, needsBedRest, randomEdgeCell, type Status } from './jobs';
@@ -60,7 +61,15 @@ export function pawnTick(w: World, p: Pawn) {
   if (p.cd > 0) p.cd--;
   if ((w.tick + p.id) % NEEDS_INTERVAL === 0) needsTick(w, p);
   if ((w.tick + p.id * 7) % HEALTH_INTERVAL === 0) { healthTick(w, p); if (p.dead) return; }
-  if ((w.tick + p.id) % 250 === 0) { socialTick(w, p); if (isAnimal(p)) animalProducts(w, p); }
+  if ((w.tick + p.id) % 250 === 0) {
+    // AI-mind colonists choose their own conversations; the rest chat by proximity
+    if (!p.mind?.on) socialTick(w, p);
+    if (isAnimal(p)) animalProducts(w, p);
+    else if (p.race === 'human' && w.isColonist(p)) {
+      if (!p.mind && w.playerByFaction(p.faction)?.minds) p.mind = newMind();
+      if (p.mind) mindTick(w, p);
+    }
+  }
   if (p.bubble && p.bubble.t < w.tick) p.bubble = undefined;
   if (p.downed) {
     if (p.mp > 0) p.mp = 0;
@@ -92,6 +101,7 @@ function interrupts(w: World, p: Pawn) {
       if (dist(p.x, p.y, enemy.x, enemy.y) <= 1.5 && !p.disabled.includes('hunt')) { assignJob(w, p, mkJob('attack', { t: enemy.id, expire: w.tick + 600 })); return; }
       const fleeCell = findFleeCell(w, p, enemy.x, enemy.y);
       if (fleeCell >= 0) { assignJob(w, p, mkJob('flee', { c: fleeCell, expire: w.tick + 900 })); p.fleeing = true; if (w.rng.chance(0.3)) w.text(p.x, p.y - 1, 'fleeing!', '#ffd24a'); }
+      if (p.mind?.on) mindEvent(w, p, `A hostile ${enemy.race === 'human' ? 'raider' : enemy.race} came within ${Math.round(dist(p.x, p.y, enemy.x, enemy.y))} tiles of you; your instincts made you run.`, true);
       return;
     }
     // critical need interrupts
@@ -131,6 +141,8 @@ export function think(w: World, p: Pawn) {
     const bed = findBedFor(w, p, p.faction);
     if (bed) { w.reserve('t' + bed.id, p.id); assignJob(w, p, mkJob('rest', { t: bed.id })); return; }
   }
+  // AI minds: a language model picks the goal; routine below only fills gaps while it thinks
+  if (p.mind?.on && mindThink(w, p)) return;
   const hour = Math.floor(w.hour);
   const sched = p.schedule[hour] || 'A';
   if (p.needs.food < 0.28) { const j = eatJob(w, p); if (j) { assignJob(w, p, j); return; } }

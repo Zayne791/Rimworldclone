@@ -18,6 +18,7 @@ import { needsTending } from './sim/health';
 import { itemLabel, pawnShortName, buildingLabel } from './sim/things';
 import { PLANTS } from './data/plants';
 import type { UI } from './ui/ui';
+import { MindController } from './mind/controller';
 
 export interface Session {
   isHost: boolean;
@@ -59,6 +60,7 @@ export class Game {
   onExit?: () => void;
   frameTimes: number[] = [];
   private raf = 0;
+  minds = new MindController(this);
 
   constructor(canvas: HTMLCanvasElement, world: World, faction: number, net: Session | null, audio: AudioEngine) {
     this.world = world;
@@ -67,7 +69,7 @@ export class Game {
     this.audio = audio;
     const self = this;
     this.renderer = new Renderer(canvas, world, {
-      faction, selection: this.selection, zones: false, roofs: false, home: false, temps: false, labels: true,
+      faction, selection: this.selection, zones: false, roofs: false, home: false, temps: false, labels: true, thinking: (id: number) => self.minds.isThinking(id),
       get overlay() { return self.tool ? { drawWorld: (ctx: CanvasRenderingContext2D, r: Renderer) => self.tool?.drawWorld?.(ctx, r) } : null; },
     } as any);
     if (this.gfx === 'fast') this.renderer.setScaleCap(1);
@@ -99,7 +101,7 @@ export class Game {
     this.raf = requestAnimationFrame(loop);
   }
   private onResize = () => this.renderer.resize();
-  stop() { this.running = false; cancelAnimationFrame(this.raf); this.net?.close(); this.input?.destroy(); window.removeEventListener('resize', this.onResize); }
+  stop() { this.running = false; cancelAnimationFrame(this.raf); this.net?.close(); this.input?.destroy(); this.minds.stop(); window.removeEventListener('resize', this.onResize); }
 
   effectiveSpeed(): number {
     const w = this.world;
@@ -178,6 +180,7 @@ export class Game {
     r.draw(dt);
     this.audio.setListener(r.cam.x / TILE, r.cam.y / TILE, Math.max(30, (r.vw / r.cam.zoom) / TILE));
     this.ui?.frame(dt);
+    try { this.minds.update(); } catch (e) { console.error('minds', e); }
     this.frameTimes.push(performance.now() - t0);
     if (this.frameTimes.length > 60) this.frameTimes.shift();
   }

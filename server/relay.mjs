@@ -1,4 +1,5 @@
-// Optional self-hosted server: serves the built game (dist/) and a WebSocket relay for multiplayer.
+// Optional self-hosted server: serves the built game (dist/), a WebSocket relay for multiplayer and
+// the /api/llm proxy for AI minds (DEEPSEEK_API_KEY env var).
 // Use this if WebRTC peer-to-peer can't connect on your network. Deploy to Render/Fly/Railway:
 //   npm run build && node server/relay.mjs   (PORT env var respected)
 // Then open  https://your-host/?relay=wss://your-host/relay
@@ -6,6 +7,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { WebSocketServer } from 'ws';
+import { handleLLM } from './llmproxy.mjs';
 
 const PORT = +(process.env.PORT || 8787);
 const DIST = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../dist');
@@ -13,6 +15,20 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent((req.url || '/').split('?')[0]);
+  if (p === '/api/llm') {
+    // AI minds proxy (set DEEPSEEK_API_KEY in the environment)
+    let raw = '';
+    req.on('data', c => { raw += c; if (raw.length > 200000) req.destroy(); });
+    req.on('end', async () => {
+      let body = null;
+      try { body = JSON.parse(raw); } catch { /* rejected below */ }
+      const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '?').split(',')[0].trim();
+      const out = req.method === 'POST' ? await handleLLM({ body, headers: req.headers, env: process.env, ip }) : { status: 405, json: { error: 'POST only' } };
+      res.writeHead(out.status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      res.end(JSON.stringify(out.json));
+    });
+    return;
+  }
   if (p === '/') p = '/index.html';
   const f = path.join(DIST, path.normalize(p).replace(/^(\.\.[/\\])+/, ''));
   fs.readFile(f, (err, data) => {

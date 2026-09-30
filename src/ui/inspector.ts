@@ -1,4 +1,5 @@
 // Inspector sheet: detailed info + action buttons ("gizmos") for the current selection.
+import { mindTab } from './mindsui';
 import type { UI } from './ui';
 import { itemIconURL, portraitURL } from './ui';
 import type { Pawn, Building, Item, Blueprint, Zone } from '../sim/types';
@@ -57,6 +58,7 @@ function pawnInsp(ui: UI, p: Pawn): InspResult {
   const fac = w.faction(p.faction);
   const pl = w.playerByFaction(p.faction);
   const tabs: [string, string][] = human ? [['overview', 'Overview'], ['health', 'Health'], ['gear', 'Gear'], ['bio', 'Skills'], ['mood', 'Mood'], ['social', 'Social']] : [['overview', 'Overview'], ['health', 'Health']];
+  if (human && p.mind) tabs.splice(1, 0, ['mind', 'Mind']);
   let tab = ui.sheetTab;
   if (!tabs.find(t => t[0] === tab)) tab = 'overview';
   let sub = '';
@@ -66,7 +68,8 @@ function pawnInsp(ui: UI, p: Pawn): InspResult {
   let body = '';
   const hp = totalHealthPct(p);
   if (tab === 'overview') {
-    body += `<div class="row"><span class="chip">${escapeHtml(jobLabel(w, p))}</span>${p.drafted ? '<span class="chip bad">drafted</span>' : ''}${p.inspired ? '<span class="chip accent">★ inspired</span>' : ''}</div>`;
+    body += `<div class="row"><span class="chip">${escapeHtml(jobLabel(w, p))}</span>${p.drafted ? '<span class="chip bad">drafted</span>' : ''}${p.inspired ? '<span class="chip accent">★ inspired</span>' : ''}${p.mind?.on ? `<span class="chip" data-a="sheettab" data-v="mind">💭 ${g.minds.isThinking(p.id) ? 'thinking…' : 'own mind'}</span>` : ''}</div>`;
+    if (p.mind?.on && p.mind.thought) body += `<div class="mind-thought small">“${escapeHtml(p.mind.thought)}”</div>`;
     body += `<div class="need"><span>Health</span>${bar(hp, needCol(hp))}<span class="small">${pct(hp)}</span></div>`;
     if (human && !p.guest?.prisoner || own) {
       const n = p.needs;
@@ -139,6 +142,8 @@ function pawnInsp(ui: UI, p: Pawn): InspResult {
     const th = breakThresholds(p);
     body += `<div class="small dim">Mental break thresholds: minor ${pct(th.minor)}, major ${pct(th.major)}, extreme ${pct(th.extreme)}</div>`;
     body += thoughtMood(p).map(t => `<div class="thought"><span>${escapeHtml(t.label)}${t.n > 1 ? ` x${t.n}` : ''}</span><span class="${t.mood >= 0 ? 'good' : 'bad'}">${t.mood > 0 ? '+' : ''}${t.mood}</span></div>`).join('') || '<div class="dim">No thoughts.</div>';
+  } else if (tab === 'mind') {
+    body += mindTab(ui, p);
   } else if (tab === 'social') {
     const rels = Object.entries(p.rel).map(([id, r]) => [w.pawns.get(+id), r] as const).filter(([o]) => o && !o.dead).sort((a, b) => b[1].op - a[1].op);
     body += rels.length ? rels.map(([o, r]) => `<div class="thought"><span>${escapeHtml(pawnShortName(o!))}${r.kind ? ` <span class="accent">(${r.kind})</span>` : ''}</span><span class="${r.op >= 0 ? 'good' : 'bad'}">${r.op > 0 ? '+' : ''}${Math.round(r.op)}</span></div>`).join('') : '<div class="dim">No relationships yet.</div>';

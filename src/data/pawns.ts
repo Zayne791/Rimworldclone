@@ -151,6 +151,11 @@ th({ id: 'got_together', label: 'Got together with a lover', mood: 15, days: 5 }
 th({ id: 'broke_up', label: 'Broke up', mood: -12, days: 10, social: -30 });
 th({ id: 'catharsis', label: 'Catharsis', mood: 30, days: 2.5 });
 th({ id: 'harmed_in_fight', label: 'Lost a social fight', mood: -5, days: 2, social: -20 });
+th({ id: 'comforted', label: 'Was comforted', mood: 6, days: 1, stack: 2, social: 12 });
+th({ id: 'praised', label: 'Was praised', mood: 4, days: 1, stack: 3, social: 8 });
+th({ id: 'shared_joke', label: 'Shared a joke', mood: 3, days: 0.5, stack: 4, social: 6 });
+th({ id: 'got_apology', label: 'Got an apology', mood: 2, days: 1, social: 10 });
+th({ id: 'argued', label: 'Had an argument', mood: -4, days: 1, stack: 3, social: -10 });
 th({ id: 'new_colonist', label: 'Welcomed a new colonist', mood: 3, days: 1, stack: 3 });
 th({ id: 'rescued', label: 'Was rescued', mood: 5, days: 3, social: 10 });
 th({ id: 'tended', label: 'Wounds tended', mood: 2, days: 1 });

@@ -18,6 +18,7 @@ import { saveToDb, listSaves, exportSave } from '../sim/save';
 import { TICKS_PER_DAY, GAME_NAME, VERSION } from '../core/constants';
 import { PRIORITY_LABELS } from '../sim/zones';
 import { techTreeWindow, techTreeAction } from './techtree';
+import { mindsWindow, mindsAction, mindsInput, voicesHtml } from './mindsui';
 
 const closeBtn = `<button class="btn sm" data-a="closemodal">${iconImg('close', 'ico s')}</button>`;
 const tabsHtml = (ui: UI, tabs: [string, string][], cur: string) => `<div class="row wrap">${tabs.map(([id, l]) => `<button class="btn sm ${cur === id ? 'on' : ''}" data-a="w:tab" data-v="${id}">${l}</button>`).join('')}</div>`;
@@ -34,7 +35,7 @@ export function refreshWindow(ui: UI) {
   const k = ui.modalKind;
   if (!k) return;
   if (k === 'colony' && st.tab === 'chat') { updateChatLog(ui); return; }
-  if (k === 'more' || k === 'letter' || k === 'trade' || k === 'p2p' || k === 'bills' && document.activeElement?.tagName === 'INPUT') return;
+  if (k === 'more' || k === 'letter' || k === 'trade' || k === 'p2p' || (k === 'bills' || k === 'minds') && document.activeElement?.tagName === 'INPUT') return;
   renderWindow(ui, k);
 }
 
@@ -51,6 +52,7 @@ function renderWindow(ui: UI, kind: string) {
     case 'p2p': return p2pWindow(ui);
     case 'letter': return letterWindow(ui);
     case 'help': return helpWindow(ui);
+    case 'minds': return mindsWindow(ui);
   }
 }
 
@@ -92,7 +94,7 @@ function colonyWindow(ui: UI) {
   const g = ui.g, w = g.world;
   if (!st.tab) st.tab = 'colonists';
   const mp = w.players.length > 1 || !!g.net;
-  const tabs: [string, string][] = [['colonists', 'Colonists'], ['animals', 'Animals'], ['factions', mp ? 'Diplomacy' : 'Factions'], ['stats', 'Stats'], ['log', 'Log']];
+  const tabs: [string, string][] = [['colonists', 'Colonists'], ['voices', 'Voices'], ['animals', 'Animals'], ['factions', mp ? 'Diplomacy' : 'Factions'], ['stats', 'Stats'], ['log', 'Log']];
   if (mp) tabs.push(['chat', 'Chat']);
   let body = '';
   if (st.tab === 'colonists') {
@@ -152,6 +154,8 @@ function colonyWindow(ui: UI) {
     if (w.players.length > 1) {
       body += `<h3>Colonies</h3>` + w.players.map(p => `<div class="row"><span style="color:${p.color}">■</span><span class="grow">${escapeHtml(p.colonyName)}</span><span>${w.colonists(p.faction).length} colonists · ${fmtNum(w.story[p.faction]?.wealth || 0)} wealth${p.won ? ' · <span class="good">escaped!</span>' : p.defeated ? ' · <span class="bad">lost</span>' : ''}</span></div>`).join('');
     }
+  } else if (st.tab === 'voices') {
+    body += `<div class="voices">${voicesHtml(ui)}</div>`;
   } else if (st.tab === 'log') {
     const ls = w.letters.filter(l => l.faction === g.faction || l.faction === 0).slice(-40).reverse();
     body += ls.map(l => `<div class="row" style="padding:3px 0;border-bottom:1px solid #2a2432" data-a="w:openletter" data-id="${l.id}"><span class="tiny dim" style="width:52px">day ${Math.floor(l.tick / TICKS_PER_DAY) + 1}</span><span class="${l.kind === 'threat' || l.kind === 'death' ? 'bad' : l.kind === 'good' ? 'good' : ''} grow">${escapeHtml(l.title)}</span></div>`).join('') || '<div class="dim">Nothing yet.</div>';
@@ -184,6 +188,7 @@ function moreWindow(ui: UI) {
     <div class="col">
       ${g.isHost ? `<button class="btn" data-a="w:save">${iconImg('save')} Save game</button><button class="btn" data-a="w:export">${iconImg('save')} Export save file</button>` : ''}
       <button class="btn" data-a="w:help">${iconImg('help')} How to play</button>
+      <button class="btn ${g.minds.enabled ? 'good' : ''}" data-a="w:mindswin">${iconImg('chat')} AI minds${g.minds.enabled ? ' (on)' : ''}</button>
     </div>
     ${mpHtml}
     <h3>Sound</h3>
@@ -205,7 +210,7 @@ function helpWindow(ui: UI) {
     ['Select many', 'Double-tap a colonist, or Orders → Select box'], ['Context actions', 'Long-press the map (right-click on desktop) with a colonist selected: equip, rescue, capture, haul…'],
     ['Combat', 'Select colonists → Draft (or tap ⚔ Draft all on the colonist bar during a raid). Then tap the ground to move, tap enemies to attack.'], ['Build', 'Build tab → pick a structure → tap or drag on the map. Walls: drag diagonally to outline a whole room!'],
     ['Zones', 'Zones tab → Stockpile / Growing zone → drag an area.'], ['Work', 'Work tab: set who does what (1 = highest priority).'], ['Research', 'Build a research bench, then pick a project in Research.'],
-    ['Speed', 'Top-right buttons. Space bar pauses on desktop. In multiplayer the game runs at the slowest speed anyone picked, so anyone can pause.'], ['Hints', 'The notes on the left flag problems; tap one with › to open the right menu.'], ['Goal', 'Survive, grow, research Starflight and build a ship to escape.'],
+    ['Speed', 'Top-right buttons. Space bar pauses on desktop. In multiplayer the game runs at the slowest speed anyone picked, so anyone can pause.'], ['Hints', 'The notes on the left flag problems; tap one with › to open the right menu.'], ['AI minds', 'Menu → AI minds lets DeepSeek play every colonist: they pick their own work, rest and fun, talk, flirt and argue. Watch the Voices tab in Colony.'], ['Goal', 'Survive, grow, research Starflight and build a ship to escape.'],
   ];
   const tips = ['Start with: a stockpile zone, a campfire and a butcher spot (both come with a starter bill), beds in a walled room, then a growing zone of rice or potatoes.', 'Hunters carry kills to the butcher spot; the cook turns the meat into meals.', 'Walls + a door enclose a room; roofs are added automatically.', 'Colonists get sad from raw food, sleeping on the ground and ugly rooms.', 'Hunt animals for meat, but beware — some fight back!', 'In winter, crops die outdoors. Build a freezer (room + cooler) to store food.', 'Raiders flee after losing half their group. Fight from behind sandbags and walls.'];
   ui.showModal('help', `<div class="wh"><h2>How to play</h2>${closeBtn}</div><div class="wb"><div class="help-grid">${rows.map(([k, v]) => `<b class="accent">${k}</b><span>${v}</span>`).join('')}</div><h3>Tips</h3>${tips.map(t => `<div class="small" style="margin:3px 0">• ${t}</div>`).join('')}</div>`);
@@ -321,6 +326,8 @@ export function windowAction(ui: UI, a: string, el: HTMLElement) {
   const d = el.dataset;
   g.audio.play('click');
   if (a.startsWith('tt') && techTreeAction(ui, a, d)) return;
+  if (a.startsWith('m') && mindsAction(ui, a, d)) return;
+  if (a === 'mindswin') { renderWindow(ui, 'minds'); return; }
   const again = () => renderWindow(ui, ui.modalKind);
   switch (a) {
     case 'tab': st.tab = d.v!; again(); break;
@@ -392,6 +399,7 @@ export function windowAction(ui: UI, a: string, el: HTMLElement) {
 
 export function windowInput(ui: UI, a: string, el: HTMLInputElement, type: string) {
   const g = ui.g;
+  if (mindsInput(ui, a, el, type)) return;
   if (a === 'sfx') { g.audio.sfxVol = +el.value / 100; g.audio.applyVolumes(); g.audio.saveSettings(); }
   if (a === 'music') { g.audio.musicVol = +el.value / 100; g.audio.applyVolumes(); g.audio.saveSettings(); }
   if (a === 'chat' && type === 'change') sendChat(ui);

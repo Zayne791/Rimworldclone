@@ -1,4 +1,5 @@
 // Player commands. Every player action goes through here (locally in single player, over the network in multiplayer).
+import { newMind, applyDecision } from './minds';
 import type { World } from './world';
 import type { Pawn, Blueprint, Building, Zone, Item } from './types';
 import { BUILDINGS } from '../data/buildings';
@@ -542,9 +543,27 @@ HANDLERS.p2p_respond = (w, f, c) => {
   w.letter(o.to, 'Trade complete', 'Goods are arriving by drop pod.', 'good');
 };
 
+// ---------------- AI minds ----------------
+HANDLERS.minds = (w, f, c) => {
+  const pl = w.playerByFaction(f);
+  if (!pl) return;
+  pl.minds = !!c.on;
+  for (const p of w.colonists(f)) {
+    if (c.on) { if (!p.mind) p.mind = newMind(); else { p.mind.on = true; p.mind.want = p.mind.want || w.tick; p.mind.why = 'your mind is your own again'; } }
+    else if (p.mind) p.mind.on = false;
+  }
+};
+HANDLERS.mind = (w, f, c) => {
+  const p = w.pawns.get(c.pawn);
+  if (!p || p.faction !== f || !p.mind?.on || p.dead) return;
+  if (c.fail) { p.mind.want = 0; p.mind.last = w.tick; return; } // model unavailable: carry on with routine for a while
+  if (!c.d || typeof c.d !== 'object') return ERR('Bad decision');
+  applyDecision(w, p, c.d, c.seen | 0);
+};
+
 HANDLERS.chat = (w, f, c) => {
   const pl = w.playerByFaction(f);
-  w.chat.push({ from: pl?.name || 'Player', text: String(c.text || '').slice(0, 200), tick: w.tick, color: pl?.color || '#fff' });
+  w.chat.push({ from: pl?.name || 'Player', text: String(c.text || '').slice(0, 200), tick: w.tick, color: pl?.color || '#fff', n: ++w.seq });
   if (w.chat.length > 100) w.chat.splice(0, w.chat.length - 100);
 };
 
