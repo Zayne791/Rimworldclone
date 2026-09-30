@@ -5,8 +5,9 @@ frontier world: build shelter, grow food, research technology, survive raids, di
 their own mental breakdowns, and finally build a ship to escape. You can play alone or share one
 map with friends, each running your own colony.
 
-Designed first for **iPad in portrait**, and it plays well on iPhone and desktop too. All art is
-procedurally generated pixel art, drawn in code at startup, so the game ships no image files.
+Designed first for **iPad in portrait**, and it plays well on iPhone and desktop too. All in-game
+art is procedurally generated pixel art, drawn in code at startup (only the home-screen icons are
+PNG files, and a script draws those too). Sound effects and music are synthesized live.
 
 ## Play locally
 
@@ -48,8 +49,8 @@ the same raids and even declare war on each other (Diplomacy).
   when the room opens and any time in the **Menu** tab, which also has a *Copy invite link* button.
   Friends who open the link go straight to the join screen.
 - **Join**: *Join multiplayer*, type the code, then pick your crew and landing spot.
-- The host's device runs the simulation. If the host leaves, the game pauses for everyone else.
-  Hosting on the most powerful device helps.
+- The host's device runs the simulation, so the world pauses for everyone if the host leaves or
+  switches away from the app (clients see "waiting for host"). Hosting on the most powerful device helps.
 - Game speed is the slowest speed anyone has chosen, so any player can pause for everyone.
 - If a connection drops, tap *Reconnect*. Rejoining from the same browser reclaims your colony.
 - Saves made by the host include every colony. Load one and choose "host" to continue together.
@@ -84,8 +85,9 @@ You can also point at your own PeerJS server with `VITE_PEER_HOST`, `VITE_PEER_P
 - **Long-press** anything for its context menu (haul, prioritize, rescue, equip, hunt…).
 - With colonists selected and **drafted**, tap the ground to move and tap an enemy to attack.
 - During a raid, a red **⚔ Draft all** button appears on the colonist bar.
-- Bottom tabs: **Build**, **Orders** (mine, chop, harvest, hunt…), **Zones**, **Work**,
-  **Research**, **Colony** (overview, schedule, animals, trade, diplomacy), **Menu**.
+- Bottom tabs: **Build**, **Orders** (mine, chop, harvest, hunt…), **Zones**, **Work** (priorities
+  and schedules), **Research**, **Colony** (colonists, animals, factions/diplomacy, stats, log), **Menu**.
+- The hints on the left flag problems; tap one marked **›** to jump to the menu that fixes it.
 - Build and zone tools support drag: drag out walls, rooms, stockpiles and fields.
 
 **Keyboard / mouse**
@@ -141,12 +143,12 @@ raid/draft flow.
 src/
   core/      rng, noise, heap, helpers, constants
   data/      game definitions (terrain, items, plants, buildings, recipes, research, animals, health)
-  sim/       deterministic simulation: world, map, mapgen, pathfinding, AI, jobs, work, needs,
+  sim/       simulation: world, map, mapgen, pathfinding, AI, jobs, work, needs,
              health, combat, rooms, power, environment, storyteller, trading, commands, save
   render/    Canvas2D renderer, chunk cache, lighting, particles; art/ = procedural pixel-art sprites
   ui/        DOM UI (HUD, inspector, drawers, tools, windows, menus) + styles
   net/       multiplayer transports (WebRTC via PeerJS, WebSocket relay) and host/client sessions
-  audio/     synthesized sound effects (WebAudio, no audio files)
+  audio/     synthesized sound effects and generative music (WebAudio, no audio files)
 server/relay.mjs   optional WebSocket relay + static file server
 tests/             headless simulation tests (run with tsx)
 dev/               screenshot / device-emulation / multiplayer harness scripts (Playwright)
