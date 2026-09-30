@@ -219,7 +219,7 @@ const construct: Giver = (w, p) => {
   }
   // repair
   const slot = w.slotOf(p.faction);
-  const dmg = [...w.buildings.values()].filter(b => b.faction === p.faction && b.hp < buildingMaxHp(b.def, b.stuff) * 0.75 && m.inHome(m.idx(b.x, b.y), slot) && !BUILDINGS[b.def].natural);
+  const dmg = [...w.buildings.values()].filter(b => b.faction === p.faction && b.hp < buildingMaxHp(b.def, b.stuff, b.faction) * 0.75 && m.inHome(m.idx(b.x, b.y), slot) && !BUILDINGS[b.def].natural);
   const r = nearest(p, dmg, b => [b.x, b.y], b => w.canReserve('t' + b.id, p.id) && reachXY(w, p, b.x, b.y));
   if (r) { w.reserve('t' + r.id, p.id); return mkJob('repair', { t: r.id }); }
   return null;
@@ -338,7 +338,15 @@ function ingredientMatches(it: Item, ing: RecipeIng, stuffCats?: string[]): bool
   if ((it.rot || 0) >= 1) return false;
   if (ing.items && ing.items.includes(it.def)) return true;
   if (ing.cats && d.stuff && d.stuff.cats.some(c => ing.cats!.includes(c))) return true;
+  if (ing.smelt && isSmeltable(it)) return true;
   return false;
+}
+/** metal weapons and apparel that an electric smelter can melt down */
+export function isSmeltable(it: Item): boolean {
+  const d = ITEMS[it.def];
+  if (!(d.weapon || d.apparel) || d.noTrade) return false;
+  if (it.stuff) return !!ITEMS[it.stuff]?.stuff?.cats.includes('metallic');
+  return !!d.weapon && !d.weapon.melee || !!d.apparel && (d.apparel.armorSharp >= 0.5);
 }
 type RecipeIng = import('../data/types').RecipeDef['ings'][number];
 

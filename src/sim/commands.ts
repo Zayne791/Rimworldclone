@@ -441,10 +441,33 @@ HANDLERS.bill = (w, f, c) => {
 HANDLERS.research = (w, f, c) => {
   const rs = w.research[f];
   if (!rs) return;
+  if (c.clearQueue) { rs.queue = []; return; }
+  if (c.unqueue) { rs.queue = (rs.queue || []).filter(q => q !== c.unqueue); return; }
   if (c.id === null) { rs.cur = null; return; }
-  if (!RESEARCH[c.id] || !canStartResearch(w, f, c.id)) return ERR('Prerequisites not met');
+  if (!RESEARCH[c.id]) return ERR('Unknown project');
+  if (c.queue) {
+    // queue the project together with every missing prerequisite, in an order that can be researched
+    const path = researchPath(w, f, c.id);
+    rs.queue = rs.queue || [];
+    for (const id of path) if (!rs.queue.includes(id) && id !== rs.cur) rs.queue.push(id);
+    if (!rs.cur) { const next = rs.queue.find(q => canStartResearch(w, f, q)); if (next) { rs.cur = next; rs.queue = rs.queue.filter(q => q !== next); } }
+    return;
+  }
+  if (!canStartResearch(w, f, c.id)) return ERR('Prerequisites not met');
   rs.cur = c.id;
+  if (rs.queue) rs.queue = rs.queue.filter(q => q !== c.id);
 };
+/** unresearched projects needed to reach id (prerequisites first), including id */
+export function researchPath(w: World, f: number, id: string): string[] {
+  const out: string[] = [];
+  const visit = (r: string) => {
+    if (isResearched(w, f, r) || out.includes(r) || !RESEARCH[r]) return;
+    for (const p of RESEARCH[r].prereqs) visit(p);
+    out.push(r);
+  };
+  visit(id);
+  return out;
+}
 
 // ---------------- trade ----------------
 HANDLERS.trade = (w, f, c) => {

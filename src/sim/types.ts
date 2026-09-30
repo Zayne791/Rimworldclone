@@ -72,6 +72,7 @@ export interface Building {
   users?: number[];
   sparks?: number;
   armed?: boolean;
+  prog?: number;         // producer / scanner progress 0..1
 }
 
 export interface Blueprint {
@@ -116,7 +117,7 @@ export interface Projectile {
   pen: number;
   dmgType: string;
   proj: string;
-  explosive?: { radius: number; damage: number; fire?: boolean };
+  explosive?: { radius: number; damage: number; fire?: boolean; emp?: boolean };
   ownerSkill?: number;
   quality?: number;
 }
@@ -230,6 +231,8 @@ export interface Pawn {
   wanderT?: number;
   desig?: string;
   carriedBy?: number;
+  shield?: number;        // shield belt energy
+  shieldT?: number;       // tick the shield last broke (recharge delay)
 }
 
 export interface StorageFilter {

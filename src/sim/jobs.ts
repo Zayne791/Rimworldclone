@@ -10,7 +10,9 @@ import { ROCKS } from '../data/terrain';
 import { ANIMALS } from '../data/animals';
 import { makeItem, placeItem, blueprintCost, blueprintWork, blueprintNeeds, stackLimit, canStack, buildingMaxHp, pawnShortName, itemLabel } from './things';
 import { completeBlueprint, destroyBuilding, mineCell, cutPlant, rollQuality } from './construction';
-import { skillSpeed, workSpeedFor, skillLevel, weaponOf, weaponDef, isAnimal, capacity } from './stats';
+import { skillSpeed, workSpeedFor, workFx, skillLevel, weaponOf, weaponDef, isAnimal, capacity } from './stats';
+import { fxw } from './techfx';
+import { workshopBonus, besideBed } from './auras';
 import { gainXp, fireAt, meleeAttack, pawnHostileTo, hitChance } from './combat';
 import { tend, die, setDowned, needsTending, applyDamage } from './health';
 import { addThought, changeOpinion } from './mood';
@@ -85,7 +87,7 @@ def('wander', {
       return 'ongoing';
     }
     j.w++;
-    if (p.race === 'human' && j.data?.joy) p.needs.joy = Math.min(1, p.needs.joy + 0.00009);
+    if (p.race === 'human' && j.data?.joy) p.needs.joy = Math.min(1, p.needs.joy + 0.00009 * (1 + fxw(w, p.faction, 'joyGain')));
     return j.w > (j.count || 90) ? 'done' : 'ongoing';
   },
 });
@@ -215,7 +217,7 @@ def('repair', {
     const r = moveTo(w, p, b.x, b.y, true, bw, bh);
     if (r === 'fail') return 'fail';
     if (r !== 'arrived') return 'ongoing';
-    const max = buildingMaxHp(b.def, b.stuff);
+    const max = buildingMaxHp(b.def, b.stuff, b.faction);
     b.hp = Math.min(max, b.hp + 0.25 * workSpeedFor(p, 'construct'));
     workTick(w, p);
     return b.hp >= max ? 'done' : 'ongoing';
@@ -345,7 +347,7 @@ def('dobill', {
     if (d.bench?.fuel && !(b.fuel && b.fuel > 0)) { dropHeld(w, p, j); return 'fail'; }
     b.users = [p.id];
     p.rot = faceTo(p, b);
-    const speed = skillSpeed(p, rec.skill) * (d.bench?.speed || 1);
+    const speed = skillSpeed(p, rec.skill) * (d.bench?.speed || 1) * workFx(p, rec.workType) * (1 + workshopBonus(w, b));
     j.w += speed;
     workTick(w, p);
     if (w.tick % 60 === 0) gainXp(p, rec.skill, 10);
@@ -373,7 +375,7 @@ function finishBill(w: World, p: Pawn, b: Building, bill: any, held: Item[]) {
     if (c?.corpse) {
       const ad = ANIMALS[c.corpse.race];
       const rotten = (c.rot || 0) > 0.8;
-      const yf = Math.min(1.1, 0.6 + skillLevel(p, 'cooking') * 0.03);
+      const yf = Math.min(1.1, 0.6 + skillLevel(p, 'cooking') * 0.03) * (1 + fxw(w, p.faction, 'animalYield'));
       if (c.corpse.race === 'human') {
         products.push(makeItem(w, 'leather', 12));
         for (const a of c.corpse.apparel) products.push({ ...a, tainted: true });
@@ -385,9 +387,16 @@ function finishBill(w: World, p: Pawn, b: Building, bill: any, held: Item[]) {
       }
       w.map.addFilth(ix, iy, FILTH.blood, 40);
     }
+  } else if (rec.special === 'smelt') {
+    for (const h of held) {
+      const hd = ITEMS[h.def];
+      if (h.stuff && ITEMS[h.stuff]?.stuff?.cats.includes('metallic')) products.push(makeItem(w, h.stuff, Math.max(1, Math.round((hd.stuffCount || 40) * 0.3))));
+      else products.push(makeItem(w, 'steel', Math.max(5, Math.min(60, Math.round(hd.value / 10)))));
+      if (hd.value >= 1000) products.push(makeItem(w, 'plasteel', Math.round(hd.value / 120)));
+    }
   } else if (rec.special === 'stuffed') {
     const stuffItem = held.find(h => ITEMS[h.def].stuff);
-    const q = rollQuality(w, skillLevel(p, 'crafting'), p.inspired === 'creativity');
+    const q = rollQuality(w, skillLevel(p, 'crafting'), p.inspired === 'creativity', p.faction);
     const it = makeItem(w, rec.product!, 1, { stuff: stuffItem?.def, quality: q });
     products.push(it);
     if (q >= 5) w.letter(p.faction, 'Masterwork!', `${pawnShortName(p)} crafted a ${itemLabel(it)}!`, 'good', ix, iy);
@@ -395,7 +404,7 @@ function finishBill(w: World, p: Pawn, b: Building, bill: any, held: Item[]) {
     for (const pr of rec.products) {
       const pd = ITEMS[pr.item];
       const it = makeItem(w, pr.item, pr.count);
-      if (pd.quality) it.quality = rollQuality(w, skillLevel(p, rec.skill));
+      if (pd.quality) it.quality = rollQuality(w, skillLevel(p, rec.skill), false, p.faction);
       products.push(it);
     }
   }
@@ -405,7 +414,7 @@ function finishBill(w: World, p: Pawn, b: Building, bill: any, held: Item[]) {
   for (const it of products) {
     it.owner = p.faction;
     const placed = placeItem(w, it, ix, iy);
-    if (placed && ITEMS[placed.def].cat === 'meal' && skillLevel(p, 'cooking') < 6 && w.rng.chance(0.04)) (placed as any).poison = true;
+    if (placed && ITEMS[placed.def].cat === 'meal' && placed.def !== 'meal_paste' && skillLevel(p, 'cooking') < 6 && w.rng.chance(0.04 * Math.max(0, 1 - fxw(w, p.faction, 'poisonReduce')))) (placed as any).poison = true;
   }
   w.sound('craft_done', ix, iy);
 }
@@ -427,7 +436,7 @@ def('research', {
     p.rot = faceTo(p, b);
     let boost = 1;
     for (const o of w.buildings.values()) if (o.def === 'multi_analyzer' && o.powered && Math.abs(o.x - b.x) < 6 && Math.abs(o.y - b.y) < 6) boost += 0.1;
-    const pts = skillSpeed(p, 'intellectual') * (d.bench?.researchSpeed || 1) * boost * 0.03;
+    const pts = skillSpeed(p, 'intellectual') * workFx(p, 'research') * (d.bench?.researchSpeed || 1) * boost * 0.03;
     const cur = rs.cur;
     rs.prog[cur] = (rs.prog[cur] || 0) + pts;
     workTick(w, p);
@@ -489,7 +498,7 @@ def('eat', {
     if (!it) return 'fail';
     const fd = ITEMS[it.def].food!;
     p.needs.food = Math.min(1, p.needs.food + fd.nutrition * it.count);
-    if (fd.joy) p.needs.joy = Math.min(1, p.needs.joy + fd.joy);
+    if (fd.joy) p.needs.joy = Math.min(1, p.needs.joy + fd.joy * (1 + fxw(w, p.faction, 'joyGain')));
     p.carry = null;
     if (p.race === 'human') {
       if (fd.thought) addThought(w, p, fd.thought);
@@ -562,7 +571,10 @@ def('sleep', {
     }
     p.asleep = true;
     const bd = bed ? BUILDINGS[bed.def].bed : null;
-    const eff = bd ? bd.restEff * (bed?.quality !== undefined ? 0.9 + bed.quality * 0.05 : 1) : 0.75;
+    let eff = bd ? bd.restEff * (bed?.quality !== undefined ? 0.9 + bed.quality * 0.05 : 1) : 0.75;
+    if (p.race === 'human') eff *= 1 + fxw(w, p.faction, 'restEff');
+    if (bed && w.tick % 60 === 0) j.data = { ...(j.data || {}), accel: besideBed(w, bed, 'sleep') };
+    if (j.data?.accel) eff *= 1.2;
     p.needs.rest = Math.min(1, p.needs.rest + (1 / (TICKS_PER_DAY * 0.32)) * eff);
     p.needs.comfort += ((bd ? bd.comfort : 0.25) - p.needs.comfort) * 0.001;
     j.w++;
@@ -577,7 +589,7 @@ def('sleep', {
 });
 export function sleepCell(w: World, bed: Building, p: Pawn): [number, number] {
   const d = BUILDINGS[bed.def];
-  if (d.bed && d.bed.sleepers > 1 && bed.owners && bed.owners.indexOf(p.id) === 1) {
+  if (d.bed && d.bed.sleepers > 1 && !d.bed.bunk && bed.owners && bed.owners.indexOf(p.id) === 1) {
     return bed.rot % 2 === 0 ? [bed.x + 1, bed.y] : [bed.x, bed.y + 1];
   }
   // head cell is the top-left for rot 0
@@ -643,7 +655,7 @@ def('joy', {
     j.w++;
     const rate = b && BUILDINGS[b.def].joy ? BUILDINGS[b.def].joy!.rate : j.data?.kind === 'sky' ? 1 : 0.8;
     if (b && BUILDINGS[b.def].power && !b.powered) return 'done';
-    p.needs.joy = Math.min(1, p.needs.joy + 0.00013 * rate);
+    p.needs.joy = Math.min(1, p.needs.joy + 0.00013 * rate * (1 + fxw(w, p.faction, 'joyGain')));
     if (j.data?.kind === 'sky') p.asleep = false;
     if (b) b.users = [p.id];
     if (b?.def === 'horseshoes' && j.w % 90 === 0) w.emit({ k: 'toss', x: p.x, y: p.y, x2: b.x, y2: b.y });
@@ -770,11 +782,11 @@ def('warden', {
     pt.guest.lastChat = w.tick;
     gainXp(p, 'social', 40);
     if (pt.guest.mode === 'recruit') {
-      const power = 1 + skillLevel(p, 'social') * 0.25;
+      const power = (1 + skillLevel(p, 'social') * 0.25) * (1 + fxw(w, p.faction, 'recruitChance'));
       if (pt.guest.resistance > 0) {
         pt.guest.resistance = Math.max(0, pt.guest.resistance - power * w.rng.range(0.6, 1.2) * (pt.needs.mood > 0.5 ? 1.2 : 0.8));
         w.text(pt.x, pt.y - 1, `resistance ${pt.guest.resistance.toFixed(1)}`, '#ccc');
-      } else if (w.rng.chance(0.3 + skillLevel(p, 'social') * 0.04)) {
+      } else if (w.rng.chance((0.3 + skillLevel(p, 'social') * 0.04) * (1 + fxw(w, p.faction, 'recruitChance') * 0.5))) {
         recruit(w, pt, p.faction);
       } else w.text(pt.x, pt.y - 1, 'recruit failed', '#f99');
     }
@@ -851,8 +863,9 @@ def('clean', {
     const r = moveTo(w, p, x, y);
     if (r === 'fail') return 'fail';
     if (r !== 'arrived') return 'ongoing';
-    j.w++;
-    if (j.w % 8 === 0) m.setFilth(i, m.filthType[i], m.filth[i] - 8);
+    const before = Math.floor(j.w / 8);
+    j.w += workFx(p, 'clean');
+    if (Math.floor(j.w / 8) > before) m.setFilth(i, m.filthType[i], m.filth[i] - 8);
     if (!m.filth[i]) {
       // chain to adjacent filth
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -891,7 +904,7 @@ def('tame', {
     if (j.w < 300) return 'ongoing';
     if (p.carry) p.carry = null;
     const ad = ANIMALS[a.race];
-    const chance = Math.max(0.02, (1 - ad.wildness) * (0.4 + skillLevel(p, 'animals') * 0.04));
+    const chance = Math.max(0.02, (1 - ad.wildness) * (0.4 + skillLevel(p, 'animals') * 0.04) * (1 + fxw(w, p.faction, 'tameChance')));
     gainXp(p, 'animals', 60);
     if (w.rng.chance(chance)) {
       a.faction = p.faction; a.animal!.tamed = true; a.animal!.name = petName(w); a.animal!.master = p.id;
@@ -936,7 +949,7 @@ def('gather', {
     const prod = ad.products?.find(pr => pr.kind === j.data.kind);
     if (prod && (a.animal.products[prod.kind] || 0) >= 1) {
       a.animal.products[prod.kind] = 0;
-      const it = makeItem(w, prod.item, prod.count, { owner: p.faction });
+      const it = makeItem(w, prod.item, Math.max(1, Math.round(prod.count * (1 + fxw(w, p.faction, 'productYield')))), { owner: p.faction });
       placeItem(w, it, a.x, a.y);
       gainXp(p, 'animals', 30);
     }

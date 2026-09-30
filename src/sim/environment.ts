@@ -12,6 +12,8 @@ import { applyDamage } from './health';
 import { buildingMaxHp, pawnShortName } from './things';
 import { FILTH } from './map';
 import { destroyBuilding } from './construction';
+import { fxw } from './techfx';
+import { fertBonus, firefoamCheck, weatherControlled } from './auras';
 
 // ---------------- weather ----------------
 export interface WeatherDef { id: string; label: string; rain: number; snow: number; light: number; accuracy: number; move: number; tempOffset: number; next: [string, number][]; lightning?: boolean; fog?: boolean }
@@ -44,6 +46,7 @@ export function weatherTick(w: World) {
   if (w.hasCondition('cold_snap')) cond -= 20;
   if (w.hasCondition('heat_wave')) cond += 18;
   w.outdoorTemp = base + wd.tempOffset + cond;
+  if (weatherControlled(w) && w.weather.cur !== 'clear' && w.weather.cur !== 'cloudy') { w.weather.cur = 'clear'; w.weather.next = 'clear'; w.weather.blend = 0; w.weather.t = TICKS_PER_DAY * 0.5; }
   if (w.weather.t <= 0) {
     let options = wd.next;
     const cold = w.outdoorTemp < 0;
@@ -187,6 +190,7 @@ export function updateCombinedLight(w: World) {
 }
 
 // ---------------- power ----------------
+export function batteryCap(w: World, b: Building) { return BUILDINGS[b.def].power!.battery! * (1 + fxw(w, b.faction, 'batteryCap')); }
 export interface PowerNet { id: number; gen: number; use: number; stored: number; cap: number; buildings: number[]; faction: number }
 
 export function powerTick(w: World) {
@@ -245,6 +249,7 @@ export function powerTick(w: World) {
           else if (pw.kind === 'fuel') { out = (b.fuel || 0) > 0 && b.on !== false ? pw.gen : 0; }
           else if (pw.kind === 'geo') out = pw.gen;
         }
+        out *= 1 + fxw(w, b.faction, 'powerGen');
         b.output = Math.round(out);
         net.gen += out;
       }
@@ -253,10 +258,11 @@ export function powerTick(w: World) {
         const bd = d.bench;
         // benches only draw full power while in use
         if (bd && !(b.users && b.users.length)) use = pw.use * 0.1;
-        if (d.heat?.power) { const t = ambientTemp(w, b.x, b.y); if (t >= (b.tgt ?? 21)) use = pw.use * 0.1; }
+        if (d.heat?.power) { const t = ambientTemp(w, b.x, b.y), tg = b.tgt ?? 21; if (d.heat.both ? Math.abs(t - tg) < 1 : t >= tg) use = pw.use * 0.1; }
+        if (d.light) use *= Math.max(0.1, 1 - fxw(w, b.faction, 'lightPower'));
         net.use += use;
       }
-      if (pw.battery) { net.stored += b.stored || 0; net.cap += pw.battery; }
+      if (pw.battery) { net.stored += b.stored || 0; net.cap += batteryCap(w, b); }
     }
     const balance = net.gen - net.use; // W
     let ok = balance >= 0;
@@ -264,7 +270,7 @@ export function powerTick(w: World) {
     if (balance > 0 && batteries.length) {
       // charge
       let e = balance * dtDays * 0.5;
-      for (const b of batteries) { const cap = BUILDINGS[b.def].power!.battery!; const add = Math.min(cap - (b.stored || 0), e / batteries.length); b.stored = (b.stored || 0) + add; }
+      for (const b of batteries) { const cap = batteryCap(w, b); const add = Math.max(0, Math.min(cap - (b.stored || 0), e / batteries.length)); b.stored = (b.stored || 0) + add; }
     } else if (balance < 0 && batteries.length) {
       const need = -balance * dtDays;
       if (net.stored >= need) {
@@ -316,12 +322,22 @@ export function plantGrowthTick(w: World) {
     const lf = light >= needLight ? 1 : pd.kind === 'tree' || pd.kind === 'grass' ? 0.2 : 0;
     let fert = m.fertility(i);
     const bid = m.bld[i];
-    if (bid) { const b = w.buildings.get(bid); if (b && BUILDINGS[b.def].growBasin) fert = b.powered ? BUILDINGS[b.def].growBasin!.fert : 0; }
-    const ff = pd.kind === 'crop' ? clamp(fert, 0.1, 2.5) : Math.min(1, fert + 0.3);
-    const rate = (dtDays / pd.growDays) * tf * lf * ff;
+    let owner = -1;
+    if (bid) { const b = w.buildings.get(bid); if (b && BUILDINGS[b.def].growBasin) { fert = b.powered ? BUILDINGS[b.def].growBasin!.fert : 0; owner = b.faction; } }
+    const crop = pd.kind === 'crop';
+    let techF = 1, hardy = 0;
+    if (crop) {
+      if (owner < 0 && m.zone[i]) owner = w.zones.get(m.zone[i])?.faction ?? -1;
+      if (owner >= 0) { techF = 1 + fxw(w, owner, 'growthRate'); hardy = fxw(w, owner, 'cropHardy'); }
+      techF += fertBonus(w, i);
+      // hardier strains keep growing a few degrees colder
+      if (hardy && !roofed && temp < 10) { const t2 = temp + hardy; tf = t2 < 0 ? 0 : t2 < 10 ? t2 / 10 : 1; if (pd.minTemp !== undefined && t2 < pd.minTemp) tf = 0; }
+    }
+    const ff = crop ? clamp(fert, 0.1, 2.5) : Math.min(1, fert + 0.3);
+    const rate = (dtDays / pd.growDays) * tf * lf * ff * techF;
     if (rate > 0) m.setGrowth(i, Math.min(1, g + rate));
     // winter kills crops outdoors
-    if (temp < -8 && !roofed && pd.kind === 'crop' && w.rng.chance(0.08)) m.setPlant(i, 0);
+    if (temp < -8 - hardy && !roofed && crop && w.rng.chance(0.08)) m.setPlant(i, 0);
   }
   // wild plant spreading (slowly repopulate)
   if (w.tick % 2000 === 0) {
@@ -370,6 +386,8 @@ export function fireTick(w: World) {
   const m = w.map;
   const rainF = WEATHERS[w.weather.cur].rain;
   for (const f of [...w.fires.values()]) {
+    if (!w.fires.has(f.id)) continue; // smothered by a firefoam popper this tick
+    if (firefoamCheck(w, f.x, f.y)) continue;
     const i = m.idx(f.x, f.y);
     f.t += 30;
     const flam = cellFlammability(w, i);
@@ -413,7 +431,13 @@ export function rotTick(w: World) {
     }
     if (d.food?.rotDays) {
       const t = ambientTemp(w, it.x, it.y);
-      if (t > 0) it.rot = Math.min(1, (it.rot || 0) + dtDays / d.food.rotDays * (t > 10 ? 1 : 0.5));
+      if (t > 0) {
+        let f = t > 10 ? 1 : 0.5;
+        if (it.owner !== undefined) f *= Math.max(0.1, 1 - fxw(w, it.owner, 'foodRot'));
+        const bid = m.bld[m.idx(it.x, it.y)];
+        if (bid && w.buildings.get(bid)?.def === 'grain_silo') f *= 0.5;
+        it.rot = Math.min(1, (it.rot || 0) + dtDays / d.food.rotDays * f);
+      }
       if ((it.rot || 0) >= 1 && w.rng.chance(0.05)) { w.despawn(it); m.addFilth(it.x, it.y, FILTH.dirt, 15); }
     }
     // outdoor deterioration

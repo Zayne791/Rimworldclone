@@ -63,6 +63,7 @@ raw('strawberry', 'strawberries', 0.05, 1.6, 14, 'veg', 'strawberry');
 raw('meat', 'raw meat', 0.05, 2, 2, 'meat', 'meat');
 raw('eggs', 'eggs', 0.05, 2.5, 15, 'animal', 'eggs');
 raw('milk', 'milk', 0.05, 2, 14, 'animal', 'milk');
+add({ id: 'honey', label: 'honey', cat: 'raw_food', stack: 75, mass: 0.03, value: 2.2, sprite: 'honey', flam: 0.5, food: { nutrition: 0.05, kind: 'veg', pref: 1 }, desc: 'Sweet, and it never spoils. Cooks like vegetables.' });
 add({ id: 'hay', label: 'hay', cat: 'feed', stack: 75, mass: 0.014, value: 0.5, sprite: 'hay', flam: 1, food: { nutrition: 0.05, kind: 'hay', pref: -1, rotDays: 60 } });
 
 add({ id: 'meal_simple', label: 'simple meal', cat: 'meal', stack: 10, mass: 0.44, value: 15, sprite: 'meal_simple', flam: 0.5, food: { nutrition: 0.9, kind: 'meal', pref: 1, rotDays: 4 } });
@@ -87,6 +88,8 @@ melee('club', 'club', 13, 'blunt', 110, ['woody', 'metallic', 'stony'], 50, 20, 
 melee('spear', 'spear', 19, 'stab', 140, ['metallic', 'woody'], 50, 45, 'spear', 0.3);
 melee('longsword', 'longsword', 23, 'cut', 150, ['metallic'], 100, 90, 'longsword', 0.33);
 melee('mace', 'mace', 21, 'blunt', 140, ['metallic'], 75, 70, 'mace', 0.28);
+add({ id: 'monosword', label: 'monosword', cat: 'weapon', stack: 1, mass: 1.5, value: 1600, sprite: 'monosword', quality: true, hp: 150, research: 'monomolecular_blades',
+  weapon: { melee: true, damage: 30, dmgType: 'cut', pen: 0.85, cooldown: 110, sound: 'melee' }, desc: 'A blade one molecule thick. Slices through almost any armor.' });
 
 const gun = (id: string, label: string, w: Omit<import('./types').WeaponProps, 'melee'>, value: number, sprite: string, cost?: Record<string, number>, research?: string) =>
   add({ id, label, cat: 'weapon', stack: 1, mass: 3, value, sprite, quality: true, hp: 100, weapon: { melee: false, ...w }, research });
@@ -100,7 +103,21 @@ gun('rifle_sniper', 'sniper rifle', { damage: 25, dmgType: 'bullet', pen: 0.38, 
 gun('lmg', 'LMG', { damage: 11, dmgType: 'bullet', pen: 0.16, cooldown: 140, range: 26, warmup: 78, burst: 6, burstDelay: 5, acc: [0.4, 0.48, 0.35, 0.26], projSpeed: 1.3, proj: 'bullet', sound: 'rifle', twoHanded: true }, 580, 'lmg');
 gun('rifle_charge', 'charge rifle', { damage: 15, dmgType: 'bullet', pen: 0.35, cooldown: 90, range: 28, warmup: 60, burst: 3, burstDelay: 7, acc: [0.55, 0.64, 0.55, 0.45], projSpeed: 1.2, proj: 'charge', sound: 'charge' }, 1100, 'rifle_charge');
 gun('grenades_frag', 'frag grenades', { damage: 45, dmgType: 'bomb', pen: 0.1, cooldown: 170, range: 13, warmup: 66, acc: [1, 1, 1, 1], projSpeed: 0.3, proj: 'rocket', sound: 'throw', explosive: { radius: 1.9, damage: 45 } }, 280, 'grenades');
+gun('bow_recurve', 'recurve bow', { damage: 14, dmgType: 'sharp', pen: 0.2, cooldown: 90, range: 26, warmup: 80, acc: [0.7, 0.82, 0.65, 0.45], projSpeed: 0.6, proj: 'arrow', sound: 'bow' }, 110, 'bow_recurve', undefined, 'archery');
+gun('bow_great', 'great bow', { damage: 17, dmgType: 'sharp', pen: 0.25, cooldown: 110, range: 30, warmup: 100, acc: [0.6, 0.78, 0.72, 0.55], projSpeed: 0.65, proj: 'arrow', sound: 'bow', twoHanded: true }, 190, 'bow_great', undefined, 'great_bows');
+gun('heavy_smg', 'heavy SMG', { damage: 12, dmgType: 'bullet', pen: 0.18, cooldown: 70, range: 20, warmup: 40, burst: 3, burstDelay: 6, acc: [0.75, 0.6, 0.38, 0.25], projSpeed: 1.2, proj: 'bullet', sound: 'rifle' }, 450, 'heavy_smg', undefined, 'heavy_weapons');
+gun('minigun', 'minigun', { damage: 10, dmgType: 'bullet', pen: 0.15, cooldown: 260, range: 30, warmup: 140, burst: 20, burstDelay: 3, acc: [0.25, 0.35, 0.3, 0.2], projSpeed: 1.3, proj: 'bullet', sound: 'rifle', twoHanded: true }, 1200, 'minigun', undefined, 'heavy_weapons');
+gun('rocket_launcher', 'rocket launcher', { damage: 60, dmgType: 'bomb', pen: 0.2, cooldown: 420, range: 30, warmup: 150, acc: [0.6, 0.7, 0.6, 0.45], projSpeed: 0.5, proj: 'rocket', sound: 'throw', explosive: { radius: 3.2, damage: 55 }, twoHanded: true }, 900, 'rocket_launcher', undefined, 'heavy_weapons');
+gun('molotov', 'molotov cocktails', { damage: 10, dmgType: 'burn', pen: 0, cooldown: 170, range: 12, warmup: 66, acc: [1, 1, 1, 1], projSpeed: 0.3, proj: 'rocket', sound: 'throw', explosive: { radius: 1.6, damage: 10, fire: true } }, 150, 'molotov', undefined, 'incendiaries');
+gun('grenades_emp', 'EMP grenades', { damage: 50, dmgType: 'bomb', pen: 0, cooldown: 170, range: 13, warmup: 66, acc: [1, 1, 1, 1], projSpeed: 0.3, proj: 'rocket', sound: 'throw', explosive: { radius: 3, damage: 50, emp: true } }, 300, 'grenades_emp', undefined, 'emp_tech');
+gun('rifle_pulse', 'pulse rifle', { damage: 20, dmgType: 'bullet', pen: 0.55, cooldown: 85, range: 32, warmup: 55, burst: 3, burstDelay: 6, acc: [0.65, 0.78, 0.72, 0.6], projSpeed: 1.4, proj: 'charge', sound: 'charge' }, 2400, 'rifle_pulse', undefined, 'pulse_weapons');
+ITEMS.molotov.desc = 'Thrown bottles of burning chemfuel. Sets targets and their cover alight.';
+ITEMS.grenades_emp.desc = 'Electromagnetic pulses: wreck and stun mechanoids and turrets. Harmless to flesh.';
 // non-tradeable built-in weapons (turrets & mechs)
+gun('autocannon_gun', 'autocannon', { damage: 23, dmgType: 'bullet', pen: 0.4, cooldown: 110, range: 32, warmup: 60, burst: 3, burstDelay: 10, acc: [0.3, 0.6, 0.5, 0.4], projSpeed: 1.4, proj: 'bullet', sound: 'sniper' }, 0, 'lmg');
+ITEMS.autocannon_gun.noTrade = true;
+gun('uranium_slug_gun', 'uranium slug cannon', { damage: 50, dmgType: 'bullet', pen: 0.75, cooldown: 350, range: 50, warmup: 90, acc: [0.3, 0.6, 0.8, 0.85], projSpeed: 1.8, proj: 'bullet', sound: 'sniper' }, 0, 'rifle_sniper');
+ITEMS.uranium_slug_gun.noTrade = true;
 gun('turret_gun', 'mini-turret gun', { damage: 11, dmgType: 'bullet', pen: 0.16, cooldown: 150, range: 29, warmup: 30, burst: 2, burstDelay: 8, acc: [0.7, 0.64, 0.41, 0.22], projSpeed: 1.3, proj: 'bullet', sound: 'rifle' }, 0, 'rifle_assault');
 ITEMS.turret_gun.noTrade = true;
 gun('charge_lance', 'charge lance', { damage: 30, dmgType: 'bullet', pen: 0.45, cooldown: 170, range: 30, warmup: 84, acc: [0.6, 0.7, 0.65, 0.55], projSpeed: 1.2, proj: 'charge', sound: 'charge' }, 1300, 'rifle_charge');
@@ -123,6 +140,13 @@ app('cowboy_hat', 'cowboy hat', { layers: ['head'], cover: ['head'], armorSharp:
 app('tuque', 'tuque', { layers: ['head'], cover: ['head'], armorSharp: 0, armorBlunt: 0, armorHeat: 0, insCold: 10, insHeat: 0, style: 'tuque' }, 30, { stuffCats: ['fabric', 'leathery'], stuffCount: 25 });
 app('armor_marine', 'marine armor', { layers: ['outer', 'middle'], cover: ['torso', 'arms', 'legs'], armorSharp: 1.06, armorBlunt: 0.45, armorHeat: 0.54, insCold: 32, insHeat: 9, style: 'armor', color: '#56606b', moveF: 0.95 }, 2000, { research: 'powered_armor' });
 app('helmet_marine', 'marine helmet', { layers: ['head'], cover: ['fullhead'], armorSharp: 1.06, armorBlunt: 0.45, armorHeat: 0.54, insCold: 8, insHeat: 2, style: 'marinehelmet', color: '#56606b' }, 700, { research: 'powered_armor' });
+app('armor_plate', 'plate armor', { layers: ['outer'], cover: ['torso', 'arms', 'legs'], armorSharp: 0.9, armorBlunt: 0.35, armorHeat: 0.2, insCold: 4, insHeat: -2, style: 'plate', moveF: 0.85 }, 450, { stuffCats: ['metallic'], stuffCount: 150, research: 'plate_armor', desc: 'Forged plates over padding. Heavy but protective.' });
+app('helmet_flak', 'flak helmet', { layers: ['head'], cover: ['head'], armorSharp: 0.6, armorBlunt: 0.25, armorHeat: 0.2, insCold: 2, insHeat: 0, style: 'helmet', color: '#5a6a4a' }, 120, { research: 'flak_armor' });
+app('shield_belt', 'shield belt', { layers: ['belt'], cover: [], armorSharp: 0, armorBlunt: 0, armorHeat: 0, insCold: 0, insHeat: 0, style: 'belt', color: '#5a7ab0', shield: 110 }, 900, { research: 'personal_shields', desc: 'Projects an energy shield that absorbs bullets and shrapnel until drained, then recharges.' });
+app('armor_recon', 'recon armor', { layers: ['outer', 'middle'], cover: ['torso', 'arms', 'legs'], armorSharp: 0.92, armorBlunt: 0.4, armorHeat: 0.46, insCold: 26, insHeat: 7, style: 'armor', color: '#5f7a6a' }, 1600, { research: 'recon_armor', desc: 'Light powered armor that does not slow you down.' });
+app('helmet_recon', 'recon helmet', { layers: ['head'], cover: ['fullhead'], armorSharp: 0.92, armorBlunt: 0.4, armorHeat: 0.46, insCold: 6, insHeat: 2, style: 'marinehelmet', color: '#5f7a6a' }, 550, { research: 'recon_armor' });
+app('armor_cataphract', 'cataphract armor', { layers: ['outer', 'middle'], cover: ['torso', 'arms', 'legs'], armorSharp: 1.4, armorBlunt: 0.6, armorHeat: 0.7, insCold: 36, insHeat: 11, style: 'armor', color: '#6a5a78', moveF: 0.9 }, 4000, { research: 'cataphract_armor', desc: 'The heaviest armor ever made for a human.' });
+app('helmet_cataphract', 'cataphract helmet', { layers: ['head'], cover: ['fullhead'], armorSharp: 1.4, armorBlunt: 0.6, armorHeat: 0.7, insCold: 10, insHeat: 3, style: 'marinehelmet', color: '#6a5a78' }, 1200, { research: 'cataphract_armor' });
 
 // ---------------- Misc ----------------
 add({ id: 'corpse', label: 'corpse', cat: 'corpse', stack: 1, mass: 60, value: 0, sprite: 'corpse', noTrade: true, flam: 1 });

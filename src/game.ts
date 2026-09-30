@@ -1,4 +1,5 @@
 // Game: owns the world (or its client mirror), the render loop, selection, tools and command routing.
+import { bindFx } from './sim/techfx';
 import type { World } from './sim/world';
 import type { Pawn, Thing, FxEvent } from './sim/types';
 import { Renderer } from './render/renderer';
@@ -131,6 +132,7 @@ export class Game {
   }
 
   frame(now: number) {
+    bindFx(this.world);
     const dt = Math.min(0.1, (now - this.last) / 1000);
     this.watchFrameRate(now - this.last);
     this.last = now;

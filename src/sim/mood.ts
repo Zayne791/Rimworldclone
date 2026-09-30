@@ -1,5 +1,7 @@
 // Needs, thoughts, mood, mental breaks and social interactions.
 import type { World } from './world';
+import { fx, fxw } from './techfx';
+import { auraBuildings } from './auras';
 import type { Pawn } from './types';
 import { THOUGHTS, TRAITS, MENTAL_BREAKS } from '../data/pawns';
 import { TICKS_PER_DAY } from '../core/constants';
@@ -53,7 +55,7 @@ export function thoughtMood(p: Pawn): { label: string; mood: number; n: number }
   }
   for (const [id, mood] of p.sit || []) {
     if (!mood) continue;
-    out.push({ label: id === 'trait_mood' ? 'Disposition' : THOUGHTS[id]?.label || id, mood: Math.round(mood), n: 1 });
+    out.push({ label: id === 'trait_mood' ? 'Disposition' : id === 'tech_mood' ? 'Colony progress (research)' : THOUGHTS[id]?.label || id, mood: Math.round(mood), n: 1 });
   }
   return out.sort((a, b) => b.mood - a.mood);
 }
@@ -67,6 +69,7 @@ export function moodTarget(p: Pawn): number {
 export function breakThresholds(p: Pawn) {
   let f = 1;
   for (const t of p.traits) f *= TRAITS[t]?.breakF || 1;
+  if (p.race === 'human') f *= Math.max(0.3, 1 - fx(p.faction, 'breakResist'));
   return { minor: 0.35 * f, major: 0.2 * f, extreme: 0.05 * f };
 }
 
@@ -174,6 +177,14 @@ export function needsTick(w: World, p: Pawn) {
   if (p.hediffs.some(h => h.type === 'toxic' && h.sev > 0.2)) add('toxic');
   if ([...w.buildings.values()].some(b => b.faction === p.faction && b.reactor?.started)) add('ship_countdown');
   if (p.wet > 0) add('soaked');
+  if (!p.guest && w.isPlayerFaction(p.faction)) {
+    const tm = fxw(w, p.faction, 'mood');
+    if (tm) add('tech_mood', tm);
+    for (const b of auraBuildings(w, 'awe')) {
+      const r = BUILDINGS[b.def].aura!.radius;
+      if ((b.x + 1 - p.x) ** 2 + (b.y + 1 - p.y) ** 2 <= r * r) { add('archotech_awe'); break; }
+    }
+  }
   p.sit = sit;
   // memory decay
   for (let k = p.thoughts.length - 1; k >= 0; k--) {

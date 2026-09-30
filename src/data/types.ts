@@ -44,7 +44,7 @@ export interface WeaponProps {
   projSpeed?: number;      // tiles per tick
   proj?: 'bullet' | 'charge' | 'arrow' | 'rocket';
   sound?: string;
-  explosive?: { radius: number; damage: number; fire?: boolean };
+  explosive?: { radius: number; damage: number; fire?: boolean; emp?: boolean };
   twoHanded?: boolean;
 }
 
@@ -61,6 +61,7 @@ export interface ApparelProps {
   style: string;       // sprite style id
   color?: string;      // fixed color for non-stuff apparel
   moveF?: number;
+  shield?: number;     // shield belt energy (absorbs ranged damage)
 }
 
 export interface ItemDef {
@@ -183,19 +184,23 @@ export interface BuildingDef {
   conduit?: boolean;
   fuel?: { item: string; cap: number; perDay: number };
   light?: { radius: number; color: [number, number, number]; power?: boolean; fuel?: boolean; sun?: boolean };
-  heat?: { watts: number; target: number; power?: boolean; fuel?: boolean };
+  heat?: { watts: number; target: number; power?: boolean; fuel?: boolean; both?: boolean };
   cooler?: boolean;
-  bed?: { sleepers: number; restEff: number; comfort: number; medical?: boolean; bedroll?: boolean };
+  bed?: { sleepers: number; restEff: number; comfort: number; medical?: boolean; bedroll?: boolean; bunk?: boolean };
   seat?: { comfort: number };
   table?: boolean;
   bench?: { recipes: string[]; power?: boolean; fuel?: boolean; speed?: number; research?: boolean; researchSpeed?: number };
   interact?: [number, number];
   joy?: { kind: string; rate: number; users?: number };
-  turret?: { weapon: string };
-  storage?: { stacks: number };
+  turret?: { weapon: string; power?: boolean };
+  storage?: { stacks: number; cats?: string[] };
   cover?: number;
   floorLevel?: boolean;
-  trap?: { damage: number };
+  trap?: { damage: number; explosive?: { radius: number; damage: number; fire?: boolean } };
+  /** makes items on its own: weighted [item, count, weight] picked every `days` */
+  producer?: { items: [string, number, number][]; days: number; power?: boolean; outdoors?: boolean; minTemp?: number };
+  /** area effect handled by sim/auras.ts */
+  aura?: { kind: 'fert' | 'moisture' | 'terraform' | 'workshop' | 'sleep' | 'tend' | 'firefoam' | 'scan' | 'weather' | 'awe'; radius: number };
   grave?: boolean;
   growBasin?: { fert: number };
   ship?: 'beam' | 'reactor' | 'engine' | 'casket' | 'computer';
@@ -222,7 +227,7 @@ export interface RecipeDef {
   id: string;
   label: string;
   benches: string[];
-  ings: { items?: string[]; cats?: string[]; count: number; nutrition?: number; label: string }[];
+  ings: { items?: string[]; cats?: string[]; smelt?: boolean; count: number; nutrition?: number; label: string }[];
   products?: { item: string; count: number }[];
   special?: 'butcher' | 'stuffed' | 'smelt';
   stuffCats?: StuffCat[];
@@ -244,6 +249,8 @@ export interface ResearchDef {
   tier: number;
   col: number;
   hiTech?: boolean;
+  branch: string;
+  effects?: Partial<Record<string, number>>;
 }
 
 export interface TraitDef {

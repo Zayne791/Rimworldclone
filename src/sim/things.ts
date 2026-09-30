@@ -6,6 +6,7 @@ import { BUILDINGS } from '../data/buildings';
 import { TERRAIN } from '../data/terrain';
 import { IMPASSABLE } from './map';
 import { ANIMALS } from '../data/animals';
+import { fx } from './techfx';
 
 export function maxItemHp(def: string, stuff?: string) {
   const d = ITEMS[def];
@@ -149,16 +150,17 @@ export function pawnShortName(p: Pawn): string {
 }
 
 // ---------------- Buildings ----------------
-export function buildingMaxHp(def: string, stuff?: string) {
+export function buildingMaxHp(def: string, stuff?: string, faction?: number) {
   const d = BUILDINGS[def];
   const s = stuffOf(stuff);
-  return Math.round(d.hp * (s ? s.hpF : 1));
+  const f = faction !== undefined && !d.natural ? 1 + fx(faction, 'buildingHp') : 1;
+  return Math.round(d.hp * (s ? s.hpF : 1) * f);
 }
 
 export function makeBuilding(w: World, def: string, x: number, y: number, rot: number, stuff: string | undefined, faction: number): Building {
   const d = BUILDINGS[def];
   const b: Building = { id: w.newId(), kind: 'building', def, x, y, rot: d.rotatable ? rot : 0, stuff, hp: 0, faction };
-  b.hp = buildingMaxHp(def, stuff);
+  b.hp = buildingMaxHp(def, stuff, faction);
   if (d.power?.use) { b.on = true; b.powered = false; }
   if (d.power?.battery) b.stored = 0;
   if (d.power?.gen) b.output = 0;
@@ -166,7 +168,7 @@ export function makeBuilding(w: World, def: string, x: number, y: number, rot: n
   if (d.bench && !d.bench.research) b.bills = [];
   if (d.bed) b.owners = [];
   if (d.heat || d.cooler) b.tgt = d.cooler ? 21 : d.heat!.target;
-  if (d.storage) { b.priority = 3; b.filter = { cats: defaultStorageCats(), deny: [] }; }
+  if (d.storage) { b.priority = 3; b.filter = { cats: d.storage.cats ? [...d.storage.cats] : defaultStorageCats(), deny: [] }; }
   if (d.quality) b.quality = 2;
   if (d.turret) { b.aim = 0; b.cd = 0; b.warm = 0; b.burst = 0; b.target = 0; }
   if (d.trap) b.armed = true;
@@ -263,6 +265,7 @@ export function buildingBeauty(b: Building): number {
   let v = (d.beauty || 0);
   if (s) v = v * (s.beautyF || 1) + s.beauty * (d.stuffCount ? Math.min(3, d.stuffCount / 25) : 1);
   if (d.quality && b.quality !== undefined) v *= [0.5, 0.75, 1, 1.25, 1.5, 2.5, 4][b.quality];
+  if (v > 0) v *= 1 + fx(b.faction, 'beautyBonus');
   return v;
 }
 

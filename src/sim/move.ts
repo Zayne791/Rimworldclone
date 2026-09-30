@@ -6,7 +6,7 @@ import { IMPASSABLE } from './map';
 import { moveSpeed } from './stats';
 import { BUILDINGS } from '../data/buildings';
 import { WEATHERS } from './environment';
-import { meleeAttack } from './combat';
+import { meleeAttack, explode } from './combat';
 import { applyDamage } from './health';
 import { destroyBuilding } from './construction';
 
@@ -101,10 +101,11 @@ function onEnterCell(w: World, p: Pawn) {
       if (d.isDoor) b.open = d.id === 'autodoor' ? 40 : 70;
       if (d.trap && b.armed && w.hostile(b.faction, p.faction) && !p.dead) {
         b.armed = false;
-        applyDamage(w, p, { amount: d.trap.damage * (0.7 + w.rng.f() * 0.6), type: 'stab', pen: 0.3, group: 'legs' });
-        w.sound('trap', p.x, p.y);
+        const ex = d.trap.explosive;
+        if (!ex) { applyDamage(w, p, { amount: d.trap.damage * (0.7 + w.rng.f() * 0.6), type: 'stab', pen: 0.3, group: 'legs' }); w.sound('trap', p.x, p.y); }
         b.hp = 0;
         destroyBuilding(w, b, 'destroyed');
+        if (ex) explode(w, p.x, p.y, ex.radius, ex.damage, 0, !!ex.fire);
       }
     }
   }

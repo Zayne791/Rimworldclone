@@ -7,6 +7,7 @@ import { ANIMALS } from '../data/animals';
 import { ITEMS, QUALITY_STAT, stuffOf } from '../data/items';
 import type { SkillId, WorkType } from '../data/types';
 import { clamp } from '../core/util';
+import { fx } from './techfx';
 
 export function bodyOf(p: Pawn): PartDef[] {
   if (p.race === 'human') return HUMAN_BODY;
@@ -56,6 +57,7 @@ export function pain(p: Pawn): number {
     else if (h.type === 'scar') pn += h.sev * 0.004;
   }
   if (p.traits.includes('tough')) pn *= 0.9;
+  if (p.race === 'human') pn *= Math.max(0.2, 1 - fx(p.faction, 'painReduce'));
   return clamp(pn, 0, 1);
 }
 
@@ -145,6 +147,7 @@ export function moveSpeed(p: Pawn): number { // tiles/second at 1x
   f *= 0.25 + 0.75 * capacity(p, 'moving');
   if (p.carry && ITEMS[p.carry.def]?.mass * p.carry.count > 40) f *= 0.8;
   if (p.carry?.corpse) f *= 0.75;
+  if (p.race === 'human') f *= 1 + fx(p.faction, 'moveSpeed');
   return Math.max(0.3, base * f);
 }
 export function ticksPerCell(p: Pawn): number { return 60 / moveSpeed(p) * (13 / 13); }
@@ -157,6 +160,7 @@ export function globalWorkSpeed(p: Pawn): number {
   f *= 0.2 + 0.8 * Math.min(1, capacity(p, 'manipulation'));
   f *= 0.6 + 0.4 * Math.min(1, capacity(p, 'consciousness'));
   if (p.inspired === 'frenzy') f *= 2;
+  if (p.race === 'human') f *= 1 + fx(p.faction, 'globalWork');
   return f;
 }
 /** skill-based work speed multiplier (1.0 at level ~8) */
@@ -164,17 +168,24 @@ export function skillSpeed(p: Pawn, s: SkillId): number {
   const l = skillLevel(p, s);
   return (0.35 + l * 0.08) * globalWorkSpeed(p);
 }
+/** research bonus key for each work type's speed */
+const WORK_FX: Partial<Record<WorkType, string>> = {
+  construct: 'constructSpeed', mine: 'mineSpeed', grow: 'plantSpeed', plantcut: 'plantSpeed', cook: 'cookSpeed',
+  research: 'researchSpeed', smith: 'craftSpeed', tailor: 'craftSpeed', craft: 'craftSpeed', clean: 'cleanSpeed',
+};
+export function workFx(p: Pawn, wt: WorkType): number { const k = WORK_FX[wt]; return k ? 1 + fx(p.faction, k) : 1; }
 export function workSpeedFor(p: Pawn, wt: WorkType): number {
+  const f = workFx(p, wt);
   switch (wt) {
-    case 'construct': return skillSpeed(p, 'construction');
-    case 'mine': return skillSpeed(p, 'mining');
-    case 'grow': case 'plantcut': return skillSpeed(p, 'plants');
-    case 'cook': return skillSpeed(p, 'cooking');
-    case 'research': return skillSpeed(p, 'intellectual');
+    case 'construct': return skillSpeed(p, 'construction') * f;
+    case 'mine': return skillSpeed(p, 'mining') * f;
+    case 'grow': case 'plantcut': return skillSpeed(p, 'plants') * f;
+    case 'cook': return skillSpeed(p, 'cooking') * f;
+    case 'research': return skillSpeed(p, 'intellectual') * f;
     case 'doctor': return skillSpeed(p, 'medical');
     case 'art': return skillSpeed(p, 'artistic');
-    case 'smith': case 'tailor': case 'craft': return skillSpeed(p, 'crafting');
-    default: return globalWorkSpeed(p);
+    case 'smith': case 'tailor': case 'craft': return skillSpeed(p, 'crafting') * f;
+    default: return globalWorkSpeed(p) * f;
   }
 }
 
@@ -183,6 +194,7 @@ export function shootAccPerCell(p: Pawn): number {
   if (isMech(p)) s = 8;
   let acc = 1 - 0.11 * Math.pow(0.87, s); // 0.89 .. 0.993
   for (const t of p.traits) acc = 1 - (1 - acc) / (TRAITS[t]?.shootAcc || 1);
+  if (p.race === 'human') acc = 1 - (1 - acc) * Math.max(0.3, 1 - fx(p.faction, 'shootAcc'));
   acc *= 0.5 + 0.5 * Math.min(1, capacity(p, 'sight'));
   return clamp(acc, 0.5, 0.995);
 }
@@ -190,6 +202,7 @@ export function meleeHitChance(p: Pawn): number {
   const s = p.race === 'human' ? skillLevel(p, 'melee') : 8;
   let c = 0.6 + s * 0.017;
   for (const t of p.traits) c *= TRAITS[t]?.meleeHit || 1;
+  if (p.race === 'human') c += fx(p.faction, 'meleeHit');
   return clamp(c * (0.5 + 0.5 * capacity(p, 'manipulation')), 0.3, 0.98);
 }
 export function meleeDodge(p: Pawn): number {
@@ -246,7 +259,7 @@ export function learnRate(p: Pawn, s: SkillId): number {
   const sk = p.skills[s];
   let f = sk.passion === 2 ? 1.5 : sk.passion === 1 ? 1 : 0.35;
   for (const t of p.traits) f *= TRAITS[t]?.learnF || 1;
-  return f;
+  return f * (1 + fx(p.faction, 'learnRate'));
 }
 
 export function weaponOf(p: Pawn): import('../data/types').WeaponProps | null {

@@ -1,5 +1,6 @@
 // The storyteller: colony wealth tracking, threat points, and incidents (raids, traders, events).
 import type { World } from './world';
+import { fxw } from './techfx';
 import type { Pawn, Item } from './types';
 import { TICKS_PER_DAY, FACTION_PIRATES, FACTION_MECHS, FACTION_OUTLANDERS, FACTION_TRIBE } from '../core/constants';
 import { generateHuman, generateAnimal, generateMech, raiderWeapon, fullName } from './pawngen';
@@ -40,7 +41,7 @@ export function threatPoints(w: World, faction: number): number {
   const teller = w.settings.storyteller === 'chill' ? 0.8 : w.settings.storyteller === 'chaos' ? w.rng.range(0.6, 1.6) : 1;
   const dayF = clamp(0.5 + w.day / 30, 0.5, 1.6);
   const base = Math.max(35, ((st?.wealth || 0) - 7000) / 110 + cols * 16);
-  return Math.round(base * diff * teller * dayF);
+  return Math.round(base * diff * teller * dayF * Math.max(0.5, 1 - fxw(w, faction, 'threatReduce')));
 }
 
 function colonyCenter(w: World, faction: number): [number, number] {
@@ -385,7 +386,7 @@ export function storytellerTick(w: World) {
       else if (r < 0.92) incidentShipChunk(w, f);
       else if (r < 0.95) incidentThrumbo(w, f);
       else { setCondition(w, 'psychic_soothe', 1, f); w.letter(f, 'Psychic soothe', 'A soothing psychic wave washes over your colonists.', 'good'); }
-      st.nextGood = t + Math.round(w.rng.range(1.5, 3) * TICKS_PER_DAY);
+      st.nextGood = t + Math.round(w.rng.range(1.5, 3) / (1 + fxw(w, f, 'goodEvents')) * TICKS_PER_DAY);
     }
     // ship reactor countdown raids
     for (const b of w.buildings.values()) {

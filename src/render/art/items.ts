@@ -188,6 +188,17 @@ const GRIDS: Record<string, (stuff?: RGBA) => Pix> = {
   medicine: () => medkit(C('#f0f0ec'), C('#d02828')),
   medicine_glitter: () => medkit(C('#5ab0f0'), C('#f8f8ff')),
   corpse: () => new Pix(16, 16),
+  honey: () => {
+    const p = new Pix(16, 16);
+    const jar: RGBA = [220, 150, 40, 235], glass: RGBA = [255, 230, 170, 150];
+    for (const [x, y] of [[2, 6], [8, 7]] as [number, number][]) {
+      p.rect(x + 1, y + 1, 6, 7, jar); p.rect(x, y + 2, 8, 5, jar);
+      p.vline(x + 1, y + 2, y + 6, glass); p.hline(x + 2, x + 5, y + 7, ramp(C('#c07a20'), 0.8));
+      p.rect(x + 1, y - 1, 6, 2, C('#8a6038')); p.hline(x + 1, x + 6, y - 1, C('#b08050'));
+      p.set(x + 5, y + 3, C('#fff0b0'));
+    }
+    return p;
+  },
 };
 
 function bars(b: RGBA): Pix {
@@ -257,6 +268,15 @@ const WEAPON_GRIDS: Record<string, [string[], Pal]> = {
   lmg: [['.....gggg........', 'kkkkggggggggggggg', 'kkk.gyyyg.g......', '....g...g........'], { k: '#2a2a2e', g: '#4a4e58', y: '#8a7a3a' }],
   rifle_charge: [['......bbb........', 'kkkkggggggggggggc', 'kkk..gg.g........'], { k: '#2a2e3a', g: '#5a6a80', b: '#7fd0ff', c: '#b0f0ff' }],
   grenades: [['.kk.', 'kggk', 'kggk', '.kk.'], { k: '#2a3a22', g: '#5a7a42' }],
+  grenades_emp: [['.kk.', 'kbbk', 'kbbk', '.kk.'], { k: '#1e2a3a', b: '#6ab0f0' }],
+  molotov: [['..w.', '.gg.', 'gggg', 'gyyg', 'gggg'], { w: '#f0e0c0', g: '#4a7a42', y: '#e0a040' }],
+  bow_recurve: [['.kk....', 'k..k.s.', '....ks.', '....ks.', 'k..k.s.', '.kk....'], { k: '#6a4020', s: '#e8e0d0' }],
+  bow_great: [['..kkk..', '.k...s.', 'k....s.', 'k....s.', 'k....s.', '.k...s.', '..kkk..'], { k: '#5a3818', s: '#f0e8d8' }],
+  heavy_smg: [['.....ggg......', 'kkkkgggggggggg', 'kkk.gyg.g.....', '....gyg.......'], { k: '#2a2a2e', g: '#4a4e58', y: '#3a3e44' }],
+  minigun: [['.....gggggggggg', 'kkkkgbbbbbbbbbb', 'kkkkgggggggggg.', '....g..........'], { k: '#2a2a2e', g: '#5a5e68', b: '#3a3e44' }],
+  rocket_launcher: [['..gggggggggggr', 'kkggggggggggrr', '..gggggggggggr', '...k..........'], { k: '#3a3a2e', g: '#5a6a4a', r: '#8a3a2a' }],
+  rifle_pulse: [['......bbbbb.......', 'kkkkkgggggggggggcc', 'kkkk..gg.g........'], { k: '#2a2e3a', g: '#6a5a88', b: '#c890ff', c: '#f0d0ff' }],
+  monosword: [['..g............', 'kkgaaaaaaaaaaab', '..g............'], { k: '#2a2a3a', g: '#8a60c0', a: '#c8e8ff', b: '#ffffff' }],
 };
 
 export function weaponPix(def: string, stuff?: RGBA): Pix {
@@ -291,6 +311,8 @@ function apparelPix(style: string, col: RGBA): Pix {
     case 'marinehelmet': p.ellipse(8, 8, 6, 6, col); p.rect(4, 7, 8, 3, C('#2a3040')); p.hline(4, 11, 7, C('#6fb0f0')); break;
     case 'cowboyhat': p.ellipse(8, 11, 7, 2, col); p.rect(5, 5, 6, 6, col); p.hline(5, 10, 9, d); p.hline(5, 10, 5, l); break;
     case 'tuque': p.ellipse(8, 10, 5, 5, col); p.rect(3, 10, 10, 3, d); p.blob(8, 4, 1.8, 1.8, C('#f0f0f0')); break;
+    case 'plate': p.poly([[3, 2], [13, 2], [15, 8], [13, 14], [3, 14], [1, 8]], col); for (let y = 4; y < 14; y += 3) p.hline(3, 12, y, d); p.rect(6, 3, 4, 3, l); p.ellipse(3, 4, 2, 2, l); p.ellipse(13, 4, 2, 2, l); break;
+    case 'belt': p.rect(1, 7, 14, 3, C('#4a3a2a')); p.rect(6, 6, 4, 5, col); p.rect(7, 7, 2, 3, C('#c8e8ff')); p.ellipse(8, 8, 7, 5, [140, 190, 255, 60]); break;
     default: p.rect(4, 4, 8, 8, col);
   }
   if (style === 'helmet') { p.map((c, x, y) => (y > 10 ? null : c)); }

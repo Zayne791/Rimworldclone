@@ -4,6 +4,7 @@ import type { Pawn, Hediff, Item } from './types';
 import { bodyOf, partMaxHp, partMissing, partDamage, shouldBeDowned, isMech, isAnimal, armorFor, hpScale, comfyTemp, capacity, skillLevel } from './stats';
 import { BLEED_RATE, INFECTION_CHANCE, DISEASES, INJURY_LABELS, type PartDef } from '../data/health';
 import { ANIMALS } from '../data/animals';
+import { ITEMS } from '../data/items';
 import { FILTH } from './map';
 import { clamp } from '../core/util';
 import { makeItem, placeItem, pawnShortName } from './things';
@@ -11,6 +12,9 @@ import { TICKS_PER_DAY } from '../core/constants';
 import { addThought, addThoughtToAll } from './mood';
 import { ambientTemp } from './rooms';
 import { explode } from './combat';
+import { fx, fxw } from './techfx';
+import { besideBed, bedUnder } from './auras';
+import { roomAt } from './rooms';
 
 export const HEALTH_INTERVAL = 60;
 
@@ -34,6 +38,17 @@ export function applyDamage(w: World, p: Pawn, di: DamageInfo): number {
   if (w.mode !== 'host') return 0;
   let amount = di.amount;
   let type = di.type;
+  // shield belts soak up bullets and shrapnel (not melee, fire or frost)
+  if ((type === 'bullet' || type === 'bomb') && p.apparel.length) {
+    const belt = p.apparel.find(a => ITEMS[a.def].apparel?.shield);
+    if (belt && (p.shield ?? 1) > 0 && w.tick >= (p.shieldT || 0)) {
+      const max = ITEMS[belt.def].apparel!.shield!;
+      p.shield = Math.min(max, p.shield ?? max) - amount * 1.5;
+      w.emit({ k: 'shield', x: p.x, y: p.y, id: p.id });
+      if (p.shield <= 0) { p.shield = 0; p.shieldT = w.tick + 1800; w.text(p.x, p.y - 0.8, 'shield down!', '#8ab8ff'); w.sound('ricochet', p.x, p.y); }
+      return 0;
+    }
+  }
   let part = di.part ? bodyOf(p).find(b => b.id === di.part) || null : pickPart(w, p, di.group);
   if (!part) return 0;
   // armor
@@ -120,6 +135,7 @@ export function bleedRate(p: Pawn): number { // fraction of blood per day
     if (h.type !== 'injury' || h.tended !== undefined) continue;
     b += (BLEED_RATE[h.kind || 'cut'] || 0) * h.sev / scale;
   }
+  if (b > 0 && p.race === 'human') b *= Math.max(0.2, 1 - fx(p.faction, 'bleedReduce'));
   return b;
 }
 
@@ -137,7 +153,12 @@ export function isSeriouslyHurt(p: Pawn) {
 
 export function tend(w: World, doctor: Pawn | null, patient: Pawn, medPotency: number) {
   const skill = doctor ? skillLevel(doctor, 'medical') : 0;
+  const fac = doctor?.faction ?? patient.faction;
+  if (medPotency > 0) medPotency *= 1 + fxw(w, fac, 'medPotency');
   let q = (0.25 + skill * 0.065) * (medPotency > 0 ? 0.55 + medPotency * 0.45 : 0.45);
+  q += fxw(w, fac, 'tendQuality');
+  const bed = bedUnder(w, patient.x, patient.y);
+  if (bed && besideBed(w, bed, 'tend')) q += 0.12;
   if (doctor === patient) q *= 0.7;
   q = clamp(q + w.rng.range(-0.15, 0.15), 0.05, 1);
   let n = 0;
@@ -234,17 +255,23 @@ export function healthTick(w: World, p: Pawn) {
   }
   // injuries & diseases
   const scale = hpScale(p);
+  const human = p.race === 'human';
+  let healF = human ? 1 + fxw(w, p.faction, 'healRate') : 1;
+  if (inBed) { const bed = bedUnder(w, p.x, p.y); if (bed && besideBed(w, bed, 'tend')) healF += 0.2; }
   for (let k = p.hediffs.length - 1; k >= 0; k--) {
     const h = p.hediffs[k];
     h.age = (h.age || 0) + HEALTH_INTERVAL;
     if (h.type === 'injury') {
       if (mech) continue; // mechs don't heal
-      const healPerDay = (h.tended !== undefined ? 3 + 9 * h.tended : 1.2) * (inBed ? 1.5 : 1) * Math.max(0.5, scale * 0.6);
+      const healPerDay = (h.tended !== undefined ? 3 + 9 * h.tended : 1.2) * (inBed ? 1.5 : 1) * Math.max(0.5, scale * 0.6) * healF;
       h.sev -= healPerDay * dt;
       // infection roll once at ~6h
       if (!h.perm && h.age >= 15000 && h.age < 15000 + HEALTH_INTERVAL) {
         const base = INFECTION_CHANCE[h.kind || 'cut'] || 0;
-        const f = h.tended !== undefined ? (1 - h.tended) * 0.6 : 1;
+        let f = h.tended !== undefined ? (1 - h.tended) * 0.6 : 1;
+        if (human) f *= Math.max(0.02, 1 - fxw(w, p.faction, 'infectionReduce'));
+        const room = roomAt(w, p.x, p.y);
+        if (room && !room.outdoors) f *= clamp(1 - room.cleanliness * 0.8, 0.45, 1.8); // sterile rooms help, filthy ones hurt
         if (base > 0 && w.rng.chance(base * f * 0.7) && !p.hediffs.some(o => o.type === 'disease' && o.kind === 'infection' && o.part === h.part)) {
           p.hediffs.push({ type: 'disease', kind: 'infection', part: h.part, sev: 0.05, imm: 0, age: 0 });
           if (w.isColonist(p)) w.letter(p.faction, `Infection: ${pawnShortName(p)}`, `${pawnShortName(p)}'s wound has become infected. Keep it tended so their immune system can win.`, 'bad', p.x, p.y, p.id);
@@ -261,7 +288,7 @@ export function healthTick(w: World, p: Pawn) {
       const rate = tended ? d.sevPerDayTended * (1.4 - (h.tended || 0)) : d.sevPerDay;
       h.sev += rate * dt;
       const fed = p.needs.food > 0.1 ? 1 : 0.6;
-      h.imm = (h.imm || 0) + d.immPerDay * dt * fed * (inBed ? 1.15 : 1);
+      h.imm = (h.imm || 0) + d.immPerDay * dt * fed * (inBed ? 1.15 : 1) * (human ? 1 + fxw(w, p.faction, 'immunity') : 1);
       if (h.imm >= 1) {
         p.hediffs.splice(k, 1); changed = true;
         if (w.isColonist(p)) w.text(p.x, p.y - 1, 'immune!', '#8fe08f');
@@ -306,6 +333,11 @@ export function healthTick(w: World, p: Pawn) {
       const h = getOrAdd(p, 'toxic');
       h.sev += 0.35 * dt;
     }
+  }
+  if (p.shield !== undefined && w.tick >= (p.shieldT || 0)) {
+    const belt = p.apparel.find(a => ITEMS[a.def].apparel?.shield);
+    if (!belt) { p.shield = undefined; p.shieldT = undefined; }
+    else p.shield = Math.min(ITEMS[belt.def].apparel!.shield!, p.shield + 4);
   }
   if (changed || w.tick % 300 < HEALTH_INTERVAL) checkDowned(w, p);
 }

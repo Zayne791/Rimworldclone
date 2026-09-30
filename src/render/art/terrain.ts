@@ -211,6 +211,25 @@ function carpetTex(seed: number, cols: string[]): Pix {
   return p;
 }
 
+function rugTex(seed: number, cols: string[]): Pix {
+  // woven rug: gold-trimmed 16px medallions on a deep field
+  const p = new Pix(TEX, TEX);
+  const [base, dark, light, gold] = cols.map(c => C(c));
+  for (let y = 0; y < TEX; y++) for (let x = 0; x < TEX; x++) {
+    const lx = x % 16, ly = y % 16;
+    const dx = Math.abs(lx - 7.5), dy = Math.abs(ly - 7.5);
+    let c = (x + y) % 2 === 0 ? base : ramp(base, 0.93);
+    if (lx === 0 || ly === 0) c = dark;
+    else if (lx === 1 || ly === 1) c = mix(gold, base, 0.45);
+    else if (Math.round(dx + dy) === 5) c = gold;
+    else if (dx + dy < 3) c = (lx + ly) % 2 ? light : ramp(light, 0.85);
+    else if (dx + dy < 5 && (lx + ly) % 3 === 0) c = mix(base, gold, 0.3);
+    if (fbm(seed, x, y) < 0.25) c = ramp(c, 0.94);
+    p.set(x, y, c);
+  }
+  return p;
+}
+
 function concreteTex(seed: number, cols: string[]): Pix {
   const p = new Pix(TEX, TEX);
   const [base, dark, light, seam] = cols.map(c => C(c));
@@ -266,6 +285,7 @@ export function terrainTexture(ti: number): Pix {
     case 'gold': p = tileTex(seed, t.colors, 8); break;
     case 'metal': p = metalTex(seed, t.colors); break;
     case 'carpet': p = carpetTex(seed, t.colors); break;
+    case 'rug': p = rugTex(seed, t.colors); break;
     case 'concrete': p = concreteTex(seed, t.colors); break;
     case 'straw': p = strawTex(seed, t.colors); break;
     default: p = soilTex(seed, t.colors);

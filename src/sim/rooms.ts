@@ -1,6 +1,7 @@
 // Room detection, room stats, temperature simulation, auto-roofing and roof collapse.
 import type { World } from './world';
 import { BUILDINGS } from '../data/buildings';
+import { TERRAIN } from '../data/terrain';
 import { ROOF } from './map';
 import { buildingValue } from './things';
 import { cellBeauty } from './mood';
@@ -123,6 +124,7 @@ export function computeRoomStats(w: World, r: Room) {
     n++;
     beauty += cellBeauty(w, i);
     if (m.filth[i]) filth += 1 + (m.filth[i] >> 6);
+    if (m.floor[i]) filth -= TERRAIN[m.floor[i]].clean || 0; // sterile & metal floors count as extra-clean
     if (m.zone[i]) counts.storage = (counts.storage || 0) + 0.05;
   }
   let bestF = -1, bestN = 0;
@@ -239,7 +241,8 @@ export function temperatureTick(w: World) {
       const r = w.rooms[rid - 1];
       if (r.outdoors) continue;
       const target = b.tgt ?? d.heat.target;
-      if (d.heat.watts > 0 ? r.temp < target : r.temp > target) heat[rid] += d.heat.watts;
+      if (d.heat.both) { if (r.temp < target - 0.5) heat[rid] += d.heat.watts; else if (r.temp > target + 0.5) heat[rid] -= d.heat.watts; }
+      else if (d.heat.watts > 0 ? r.temp < target : r.temp > target) heat[rid] += d.heat.watts;
     } else if (d.cooler && b.powered && b.on !== false) {
       // cold side: front (rot direction), hot side: back
       const [fx, fy] = rotDir(b.rot);

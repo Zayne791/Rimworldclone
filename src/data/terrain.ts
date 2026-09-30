@@ -21,17 +21,23 @@ export const TERRAIN: TerrainDef[] = [
   // constructed floors
   { id: 'wood_floor', label: 'wood floor', style: 'wood', colors: ['#8a6038', '#74502e', '#9c7044', '#5f4126'], fert: 0, moveCost: 0, beauty: 1, floor: true, cost: { wood: 3 }, work: 85, canBuild: true, clean: 0 },
   { id: 'straw_matting', label: 'straw matting', style: 'straw', colors: ['#c2a45a', '#a88c48', '#d4b86c', '#8e7438'], fert: 0, moveCost: 0, beauty: 0, floor: true, cost: { hay: 4 }, work: 40, canBuild: true },
-  { id: 'concrete', label: 'concrete', style: 'concrete', colors: ['#8c8c88', '#7c7c78', '#9c9c98', '#6c6c68'], fert: 0, moveCost: 0, beauty: 0, floor: true, cost: { steel: 1 }, work: 50, canBuild: true, research: 'stonecutting' },
+  { id: 'concrete', label: 'concrete', style: 'concrete', colors: ['#8c8c88', '#7c7c78', '#9c9c98', '#6c6c68'], fert: 0, moveCost: 0, beauty: 0, floor: true, cost: { steel: 1 }, work: 50, canBuild: true, research: 'masonry' },
   { id: 'granite_tile', label: 'granite tile', style: 'tile', colors: ['#77706c', '#625c58', '#8a8480', '#4e4846'], fert: 0, moveCost: 0, beauty: 1, floor: true, cost: { blocks_granite: 4 }, work: 400, canBuild: true, research: 'stonecutting' },
   { id: 'marble_tile', label: 'marble tile', style: 'tile', colors: ['#c4c2bc', '#aeaca6', '#d6d4ce', '#94928c'], fert: 0, moveCost: 0, beauty: 2, floor: true, cost: { blocks_marble: 4 }, work: 400, canBuild: true, research: 'stonecutting' },
   { id: 'sandstone_tile', label: 'sandstone tile', style: 'tile', colors: ['#aa8064', '#946e54', '#bc9276', '#7c5a44'], fert: 0, moveCost: 0, beauty: 1, floor: true, cost: { blocks_sandstone: 4 }, work: 400, canBuild: true, research: 'stonecutting' },
-  { id: 'steel_tile', label: 'steel tile', style: 'metal', colors: ['#8f98a0', '#7a838b', '#a4adb5', '#646c74'], fert: 0, moveCost: 0, beauty: 1, floor: true, cost: { steel: 7 }, work: 500, canBuild: true, research: 'stonecutting', clean: 0.2 },
+  { id: 'steel_tile', label: 'steel tile', style: 'metal', colors: ['#8f98a0', '#7a838b', '#a4adb5', '#646c74'], fert: 0, moveCost: 0, beauty: 1, floor: true, cost: { steel: 7 }, work: 500, canBuild: true, research: 'masonry', clean: 0.2 },
   { id: 'sterile_tile', label: 'sterile tile', style: 'sterile', colors: ['#dfe6ea', '#c8d0d6', '#eef3f6', '#a8b4bc'], fert: 0, moveCost: 0, beauty: 1, floor: true, cost: { steel: 3, silver: 12 }, work: 600, canBuild: true, research: 'sterile_materials', clean: 0.6 },
   { id: 'carpet_red', label: 'red carpet', style: 'carpet', colors: ['#8c2f36', '#74262c', '#a3404a', '#c25a62'], fert: 0, moveCost: 0, beauty: 2, floor: true, cost: { cloth: 7 }, work: 200, canBuild: true, research: 'complex_furniture' },
   { id: 'carpet_blue', label: 'blue carpet', style: 'carpet', colors: ['#2f4a8c', '#263d74', '#405ca3', '#5a78c2'], fert: 0, moveCost: 0, beauty: 2, floor: true, cost: { cloth: 7 }, work: 200, canBuild: true, research: 'complex_furniture' },
   { id: 'carpet_green', label: 'green carpet', style: 'carpet', colors: ['#2f6c42', '#265a36', '#408254', '#5a9c6c'], fert: 0, moveCost: 0, beauty: 2, floor: true, cost: { cloth: 7 }, work: 200, canBuild: true, research: 'complex_furniture' },
   { id: 'gold_tile', label: 'gold tile', style: 'gold', colors: ['#d8b040', '#b89030', '#ecc858', '#8c6c20'], fert: 0, moveCost: 0, beauty: 12, floor: true, cost: { gold: 40 }, work: 800, canBuild: true, research: 'stonecutting' },
   { id: 'smooth_granite', label: 'smooth granite', style: 'smooth', colors: ['#7a7572', '#686462', '#8a8684', '#56524f'], fert: 0, moveCost: 0, beauty: 2, canBuild: true, smooth: true },
+  // research-tree floors (appended: terrain indices are saved in maps)
+  { id: 'carpet_purple', label: 'purple carpet', style: 'carpet', colors: ['#5e3a82', '#4c2e6c', '#724a98', '#8e66b4'], fert: 0, moveCost: 0, beauty: 3, floor: true, cost: { cloth: 7 }, work: 200, canBuild: true, research: 'interior_design' },
+  { id: 'carpet_gold', label: 'gold carpet', style: 'carpet', colors: ['#a07a2a', '#8a6822', '#b88e38', '#d4ac50'], fert: 0, moveCost: 0, beauty: 3, floor: true, cost: { cloth: 7 }, work: 200, canBuild: true, research: 'interior_design' },
+  { id: 'fine_rug', label: 'fine rug', style: 'rug', colors: ['#7a1e2e', '#5e1622', '#9a3040', '#d8b060'], fert: 0, moveCost: 0, beauty: 6, floor: true, cost: { cloth: 12, gold: 1 }, work: 450, canBuild: true, research: 'luxury_living' },
+  { id: 'silver_tile', label: 'silver tile', style: 'gold', colors: ['#c4ccd4', '#a8b0b8', '#dce2e8', '#8a929a'], fert: 0, moveCost: 0, beauty: 6, floor: true, cost: { silver: 70 }, work: 700, canBuild: true, research: 'luxury_living' },
+  { id: 'plasteel_tile', label: 'plasteel tile', style: 'metal', colors: ['#7ec2bc', '#6aaaa4', '#98d8d2', '#56908a'], fert: 0, moveCost: 0, beauty: 2, floor: true, cost: { plasteel: 3 }, work: 250, canBuild: true, research: 'prefab', clean: 0.4 },
 ];
 
 export const TERRAIN_INDEX: Record<string, number> = {};

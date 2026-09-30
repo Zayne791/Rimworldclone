@@ -11,9 +11,10 @@ import { clamp } from '../core/util';
 import { CHUNK, FILTH } from './map';
 import { addThought } from './mood';
 import { explode } from './combat';
+import { fxw } from './techfx';
 
-export function rollQuality(w: World, skill: number, inspired = false): number {
-  const mean = 1 + skill * 0.17 + (inspired ? 1 : 0);
+export function rollQuality(w: World, skill: number, inspired = false, faction?: number): number {
+  const mean = 1 + skill * 0.17 + (inspired ? 1 : 0) + (faction !== undefined ? fxw(w, faction, 'craftQuality') * 0.45 : 0);
   let q = Math.round(w.rng.gauss(mean, 0.9));
   if (q >= 6 && !inspired && w.rng.chance(0.7)) q = 5;
   return clamp(q, 0, 6);
@@ -49,7 +50,7 @@ export function completeBlueprint(w: World, bp: Blueprint, builder: Pawn | null)
   const b = makeBuilding(w, bp.def, bp.x, bp.y, bp.rot, bp.stuff, bp.faction);
   if (d.quality && builder) {
     const skill = skillLevel(builder, d.art ? 'artistic' : 'construction');
-    b.quality = rollQuality(w, skill, builder.inspired === 'creativity');
+    b.quality = rollQuality(w, skill, builder.inspired === 'creativity', builder.faction);
     if (b.quality >= 4 && builder.race === 'human') {
       if (d.art) addThought(w, builder, 'beautiful_sculpture');
       w.letter(bp.faction, `${['awful', 'poor', 'normal', 'good', 'excellent', 'masterwork', 'legendary'][b.quality]} ${d.label}`, `${pawnShortName(builder)} has created a ${['awful', 'poor', 'normal', 'good', 'excellent', 'masterwork', 'legendary'][b.quality]} ${buildingLabel(b)}!`, 'good', b.x, b.y, b.id);
@@ -119,7 +120,7 @@ export function mineCell(w: World, i: number, miner: Pawn | null) {
   const rd = ROCKS[r];
   const x = i % m.w, y = (i / m.w) | 0;
   const skill = miner ? skillLevel(miner, 'mining') : 5;
-  const yieldF = clamp(0.6 + skill * 0.025, 0.6, 1.1);
+  const yieldF = clamp(0.6 + skill * 0.025, 0.6, 1.1) * (miner ? 1 + fxw(w, miner.faction, 'mineYield') : 1);
   m.setRock(i, 0);
   m.setDesig(i, 0, 0);
   // floor under mined ore uses base stone
@@ -142,7 +143,8 @@ export function cutPlant(w: World, i: number, cutter: Pawn | null, harvestOnly =
   const yieldF = clamp(0.55 + skill * 0.03, 0.55, 1.15);
   const owner = cutter?.faction;
   if (pd.harvestItem && g >= (pd.harvestMin ?? 1) - 0.001) {
-    const n = Math.max(1, Math.round((pd.harvestYield || 1) * yieldF * (pd.kind === 'crop' ? 1 : 0.8)));
+    const techF = pd.kind === 'crop' && owner !== undefined ? 1 + fxw(w, owner, 'harvestYield') : 1;
+    const n = Math.max(1, Math.round((pd.harvestYield || 1) * yieldF * techF * (pd.kind === 'crop' ? 1 : 0.8)));
     spawnItem(w, pd.harvestItem, n, x, y, { owner });
     if (pd.regrow !== undefined) { m.setGrowth(i, pd.regrow); m.setDesig(i, 0, 0); return; }
   } else if (pd.woodYield && g > 0.15) {

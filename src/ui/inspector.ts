@@ -20,7 +20,7 @@ import { roomAt, impressLabel, ambientTemp } from '../sim/rooms';
 import { PRIORITY_LABELS } from '../sim/zones';
 import { bodyOf } from '../sim/stats';
 import { isResearched } from '../sim/research';
-import { lightAt } from '../sim/environment';
+import { lightAt, batteryCap } from '../sim/environment';
 import { RECIPES } from '../data/recipes';
 import { shipStatus } from '../sim/commands';
 import { SelectBoxTool, ZoneTool } from './tools';
@@ -186,7 +186,7 @@ function buildingInsp(ui: UI, b: Building): InspResult {
   const g = ui.g, w = g.world;
   const d = BUILDINGS[b.def];
   const own = b.faction === g.faction;
-  const max = buildingMaxHp(b.def, b.stuff);
+  const max = buildingMaxHp(b.def, b.stuff, b.faction);
   let body = '';
   if (d.desc) body += `<div class="small dim">${escapeHtml(d.desc)}</div>`;
   body += `<div class="kv small" style="margin-top:6px"><span>Hit points</span><span>${Math.round(b.hp)} / ${max}</span>`;
@@ -194,7 +194,7 @@ function buildingInsp(ui: UI, b: Building): InspResult {
   if (d.beauty || b.stuff) body += `<span>Beauty</span><span>${buildingBeauty(b).toFixed(1)}</span>`;
   if (d.power?.use) body += `<span>Power</span><span class="${b.powered ? 'good' : 'bad'}">${b.on === false ? 'switched off' : b.powered ? `on (${d.power.use} W)` : 'NO POWER'}</span>`;
   if (d.power?.gen) body += `<span>Output</span><span class="good">${b.output || 0} W</span>`;
-  if (d.power?.battery) body += `<span>Stored</span><span>${Math.round(b.stored || 0)} / ${d.power.battery} Wd</span>`;
+  if (d.power?.battery) body += `<span>Stored</span><span>${Math.round(b.stored || 0)} / ${Math.round(batteryCap(w, b))} Wd</span>`;
   if (d.fuel) body += `<span>Fuel</span><span class="${(b.fuel || 0) <= 0 ? 'bad' : ''}">${(b.fuel || 0).toFixed(0)} / ${d.fuel.cap} ${ITEMS[d.fuel.item].label}</span>`;
   if (d.heat || d.cooler) body += `<span>Target temp</span><span>${b.tgt}°C</span>`;
   if (d.bed) body += `<span>Owner${d.bed.sleepers > 1 ? 's' : ''}</span><span>${(b.owners || []).map(id => w.pawns.get(id)).filter(Boolean).map(p => escapeHtml(pawnShortName(p!))).join(', ') || 'none'}</span>${b.medical || d.bed.medical ? '<span>Medical</span><span class="good">yes</span>' : ''}${b.prison ? '<span>For prisoners</span><span class="warn">yes</span>' : ''}`;

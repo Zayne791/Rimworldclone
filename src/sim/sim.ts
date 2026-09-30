@@ -11,6 +11,8 @@ import { BUILDINGS } from '../data/buildings';
 import { TICKS_PER_DAY } from '../core/constants';
 import { pawnShortName } from './things';
 import { setStatTick } from './stats';
+import { bindFx } from './techfx';
+import { auraTick } from './auras';
 
 let turretCache: { v: number; ids: number[] } = { v: -1, ids: [] };
 let tickErrors = 0;
@@ -19,6 +21,7 @@ export function simTick(w: World) {
   w.tick++;
   const t = w.tick;
   setStatTick(t);
+  bindFx(w);
   for (const p of [...w.pawns.values()]) {
     // one pawn's bad state must not stall the world: drop its job and move on (reported, not hidden)
     try { pawnTick(w, p); } catch (e) { if (tickErrors++ < 10) console.error('pawn tick error', p.id, p.race, p.job?.type, e); p.job = null; p.queue = []; p.path = null; }
@@ -32,7 +35,7 @@ export function simTick(w: World) {
   if (t % 50 === 0) plantGrowthTick(w);
   if (t % 60 === 0) { powerTick(w); fuelTick(w); for (const l of [...w.lords.values()]) lordTick(w, l); shipTick(w); }
   if (t % 120 === 0) temperatureTick(w);
-  if (t % 250 === 0) { weatherTick(w); rotTick(w); updateCombinedLight(w); }
+  if (t % 250 === 0) { weatherTick(w); rotTick(w); updateCombinedLight(w); auraTick(w); }
   if (t % 500 === 0) snowTick(w);
   if (t % 1000 === 0) storytellerTick(w);
   if (t % 10 === 0 && w.map.lightDirty) { recomputeLight(w); updateCombinedLight(w); }

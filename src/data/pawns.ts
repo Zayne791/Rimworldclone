@@ -204,6 +204,7 @@ th({ id: 'ship_countdown', label: 'Waiting for launch', mood: 5 });
 th({ id: 'wearing_tattered', label: 'Tattered apparel', mood: -3 });
 th({ id: 'eclipse_gloom', label: 'Eclipse gloom', mood: -3 });
 th({ id: 'aurora', label: 'Saw an aurora', mood: 6 });
+th({ id: 'archotech_awe', label: 'Awed by the archotech monument', mood: 10 });
 
 export const MENTAL_BREAKS = {
   minor: [

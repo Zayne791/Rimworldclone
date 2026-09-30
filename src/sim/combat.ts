@@ -7,7 +7,8 @@ import { ANIMALS } from '../data/animals';
 import type { WeaponProps } from '../data/types';
 import { applyDamage } from './health';
 import { lineOfSight } from './path';
-import { shootAccPerCell, meleeHitChance, meleeDodge, weaponOf, weaponDef, skillLevel, isMech, bodySize } from './stats';
+import { shootAccPerCell, meleeHitChance, meleeDodge, weaponOf, weaponDef, skillLevel, isMech, bodySize, learnRate } from './stats';
+import { fxw } from './techfx';
 import { destroyBuilding } from './construction';
 import { WEATHERS, startFire } from './environment';
 import { clamp, dist } from '../core/util';
@@ -68,6 +69,7 @@ export function fireAt(w: World, shooter: Pawn | null, turret: Building | null, 
   const tSize = target.kind === 'pawn' ? bodySize(target) : 2;
   const hc = hitChance(w, shooter, wp, sx, sy, tx, ty, tSize);
   const cover = target.kind === 'pawn' ? coverFor(w, sx, sy, Math.round(tx), Math.round(ty)) : { v: 0, id: 0, cell: -1 };
+  if (cover.v > 0 && target.kind === 'pawn') cover.v = Math.min(0.95, cover.v * (1 + fxw(w, target.faction, 'coverBonus')));
   const r = w.rng.f();
   let destX = tx, destY = ty, hit = false, coverHit = 0;
   if (r < hc) {
@@ -84,6 +86,7 @@ export function fireAt(w: World, shooter: Pawn | null, turret: Building | null, 
   let damage = wp.damage;
   const q = shooter?.equip?.quality;
   if (q !== undefined) damage *= QUALITY_STAT[q];
+  if (turret) damage *= 1 + fxw(w, turret.faction, 'turretDamage');
   const proj: Projectile = {
     id: w.newId(), kind: 'projectile', def: weapon, x: sx, y: sy, sx, sy, tx: destX, ty: destY,
     speed: wp.projSpeed || 1, shooter: shooter?.id || turret?.id || 0, shooterFaction: faction, target: target.id,
@@ -102,8 +105,7 @@ export function fireAt(w: World, shooter: Pawn | null, turret: Building | null, 
 export function gainXp(p: Pawn, s: string, amt: number) {
   const sk = (p.skills as any)[s];
   if (!sk) return;
-  const f = sk.passion === 2 ? 1.5 : sk.passion === 1 ? 1 : 0.35;
-  sk.xp += amt * f;
+  sk.xp += amt * learnRate(p, s as any);
   const need = 1000 + sk.lvl * 400;
   if (sk.xp >= need && sk.lvl < 20) { sk.xp -= need; sk.lvl++; }
 }
@@ -120,7 +122,7 @@ export function projectileTick(w: World, pr: Projectile) {
 function impact(w: World, pr: Projectile) {
   const m = w.map;
   const cx = Math.round(pr.x), cy = Math.round(pr.y);
-  if (pr.explosive) { explode(w, pr.x, pr.y, pr.explosive.radius, pr.explosive.damage, pr.shooter, !!pr.explosive.fire); return; }
+  if (pr.explosive) { explode(w, pr.x, pr.y, pr.explosive.radius, pr.explosive.damage, pr.shooter, !!pr.explosive.fire, !!pr.explosive.emp); return; }
   const shooter = w.pawns.get(pr.shooter) || null;
   if (pr.hit) {
     const t = w.things.get(pr.target);
@@ -180,7 +182,7 @@ export function meleeAttack(w: World, a: Pawn, target: Pawn | Building) {
     dmg = atk.damage; type = atk.type; cd = atk.cooldown; label = atk.label; pen = 0.15;
   }
   a.cd = cd;
-  if (a.race === 'human') { dmg *= 0.85 + skillLevel(a, 'melee') * 0.02; gainXp(a, 'melee', 15); }
+  if (a.race === 'human') { dmg *= (0.85 + skillLevel(a, 'melee') * 0.02) * (1 + fxw(w, a.faction, 'meleeDamage')); gainXp(a, 'melee', 15); }
   a.aimX = target.x; a.aimY = target.y;
   if (target.kind === 'building') {
     damageBuilding(w, target, dmg * 1.5, a.id);
@@ -204,8 +206,9 @@ export function damageBuilding(w: World, b: Building, amount: number, instigator
   else if (w.isPlayerFaction(b.faction) && d.blocksRoom) w._cache.lastBash = w.tick;
 }
 
-export function explode(w: World, x: number, y: number, radius: number, damage: number, instigator: number, fire: boolean) {
+export function explode(w: World, x: number, y: number, radius: number, damage: number, instigator: number, fire: boolean, emp = false) {
   const m = w.map;
+  if (emp) { empBlast(w, x, y, radius, damage, instigator); return; }
   w.emit({ k: 'explosion', x, y, x2: radius });
   w.sound('explosion', x, y);
   const r = Math.ceil(radius);
@@ -224,6 +227,31 @@ export function explode(w: World, x: number, y: number, radius: number, damage: 
     if (items) for (const id of [...items]) { const it = w.items.get(id); if (it && !it.corpse) { it.hp -= damage * f; if (it.hp <= 0) w.despawn(it); } }
     if (fire && w.rng.chance(0.6)) startFire(w, xx, yy, 0.5);
     else if (!fire && w.rng.chance(0.15)) m.addFilth(xx, yy, FILTH.ash, 20);
+  }
+}
+
+/** EMP: wrecks and stuns machines (mechanoids, turrets, powered buildings); harmless to flesh */
+function empBlast(w: World, x: number, y: number, radius: number, damage: number, instigator: number) {
+  const m = w.map;
+  w.emit({ k: 'emp', x, y, x2: radius });
+  w.sound('explosion', x, y);
+  const r = Math.ceil(radius), cx = Math.round(x), cy = Math.round(y);
+  const hitB = new Set<number>();
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const xx = cx + dx, yy = cy + dy;
+    if (!m.inb(xx, yy) || Math.hypot(xx - x, yy - y) > radius) continue;
+    for (const p of w.pawnsAt(xx, yy)) {
+      if (!isMech(p)) continue;
+      applyDamage(w, p, { amount: damage, type: 'burn', pen: 1, instigator, noArmor: true });
+      p.stun = Math.max(p.stun || 0, 360);
+      w.emit({ k: 'spark', x: p.x, y: p.y });
+    }
+    const b = w.buildingAt(xx, yy);
+    if (b && !hitB.has(b.id) && (BUILDINGS[b.def].turret || BUILDINGS[b.def].power)) {
+      hitB.add(b.id);
+      if (BUILDINGS[b.def].turret) { damageBuilding(w, b, damage * 0.8, instigator); b.cd = Math.max(b.cd || 0, 600); }
+      w.emit({ k: 'spark', x: b.x, y: b.y });
+    }
   }
 }
 
@@ -272,6 +300,7 @@ export function findHostileBuilding(w: World, p: Pawn, radius: number): Building
 export function turretTick(w: World, b: Building) {
   const d = BUILDINGS[b.def];
   if (!d.turret) return;
+  if (d.turret.power && !b.powered) return;
   if (b.cd && b.cd > 0) { b.cd--; return; }
   const weapon = d.turret.weapon;
   const wp = ITEMS[weapon].weapon!;

@@ -11,7 +11,7 @@ import { BUILDINGS } from '../data/buildings';
 import { ITEMS } from '../data/items';
 import { TERRAIN } from '../data/terrain';
 import { TILE } from '../core/constants';
-import { sunLight, WEATHERS } from '../sim/environment';
+import { sunLight, WEATHERS, batteryCap } from '../sim/environment';
 import { weaponDef } from '../sim/stats';
 import { clamp } from '../core/util';
 import { iconURL } from './art/icons';
@@ -126,6 +126,13 @@ export class Renderer {
       case 'zzz': P.push({ x: tx + 4, y: ty - 10, vx: 6, vy: -10, t: 0, life: 1.6, kind: 'z' }); break;
       case 'work': if (Math.random() < 0.5) P.push({ x: tx + (Math.random() - 0.5) * 10, y: ty - 4, vx: (Math.random() - 0.5) * 20, vy: -20, t: 0, life: 0.3, kind: 'spark', c: '#e8dcb0' }); break;
       case 'toss': P.push({ x: tx, y: ty - 6, vx: ((e.x2! - e.x) * TILE) / 0.6, vy: ((e.y2! - e.y) * TILE) / 0.6 - 50, t: 0, life: 0.6, kind: 'shoe' }); break;
+      case 'emp': {
+        P.push({ x: tx, y: ty, vx: 0, vy: 0, t: 0, life: 0.6, kind: 'ring', size: (e.x2 || 3) * TILE, c: '#8ad0ff' });
+        for (let k = 0; k < 16; k++) { const a = Math.random() * Math.PI * 2, s = 30 + Math.random() * 60; P.push({ x: tx, y: ty, vx: Math.cos(a) * s, vy: Math.sin(a) * s, t: 0, life: 0.5, kind: 'spark', c: '#bfe8ff' }); }
+        break;
+      }
+      case 'shield': P.push({ x: tx, y: ty - 6, vx: 0, vy: 0, t: 0, life: 0.3, kind: 'ring', size: 11, c: '#8ab8ff' }); break;
+      case 'foam': for (let k = 0; k < 40; k++) { const a = Math.random() * Math.PI * 2, s = 20 + Math.random() * (e.x2 || 5) * TILE * 1.4; P.push({ x: tx, y: ty, vx: Math.cos(a) * s, vy: Math.sin(a) * s, t: 0, life: 1 + Math.random(), kind: 'steam', size: 4 + Math.random() * 5 }); } break;
       case 'launch': for (let k = 0; k < 60; k++) P.push({ x: tx + (Math.random() - 0.5) * 30, y: ty, vx: (Math.random() - 0.5) * 80, vy: -Math.random() * 120, t: 0, life: 2 + Math.random() * 2, kind: 'smoke', size: 5 + Math.random() * 6 }); this.flash = 0.6; break;
     }
   }
@@ -366,7 +373,7 @@ export class Renderer {
     if (d.light) state.lit = d.light.fuel ? (b.fuel || 0) > 0 : !!b.powered;
     if (d.bench) state.lit = (b.users && b.users.length > 0) && (d.bench.fuel ? (b.fuel || 0) > 0 : true);
     if (d.power?.use) state.powered = !!b.powered;
-    if (d.power?.battery) state.charge = (b.stored || 0) / d.power.battery;
+    if (d.power?.battery) state.charge = Math.min(1, (b.stored || 0) / batteryCap(this.w, b));
     if (d.power?.kind === 'fuel') state.lit = (b.fuel || 0) > 0;
     if (d.plantPot) state.plant = b.plant;
     if (d.art) state.seed = b.id;
@@ -375,7 +382,7 @@ export class Renderer {
     if (d.growBasin) state.powered = !!b.powered;
     const s = buildingSprite(b.def, b.stuff, b.rot, state);
     drawSprite(ctx, s, X, Y);
-    if (d.turret) { const t = turretTopSprite(b.aim || 0); drawSprite(ctx, t, X, Y); }
+    if (d.turret) { const t = turretTopSprite(b.aim || 0, b.def); drawSprite(ctx, t, X, Y); }
     if (d.id === 'gen_wind') { const fr = Math.floor(this.time * (2 + this.w.weather.windSpeed * 14)); drawSprite(ctx, bladesSprite(fr), X, Y); }
     if (d.id === 'gen_geo' || d.id === 'geyser') { if (Math.random() < 0.08) this.particles.push({ x: X + 16 + (Math.random() - 0.5) * 8, y: Y + 8, vx: (Math.random() - 0.5) * 6, vy: -18, t: 0, life: 1.5, kind: 'steam', size: 3 + Math.random() * 3 }); }
     if (d.id === 'campfire' || d.id === 'torch') { if ((b.fuel || 0) > 0) this.drawFlame(ctx, X + 8, Y + (d.id === 'torch' ? -2 : 10), d.id === 'torch' ? 0.6 : 1); }
@@ -591,7 +598,7 @@ export class Renderer {
     const P = this.particles;
     for (let k = P.length - 1; k >= 0; k--) {
       const p = P[k];
-      const post = p.kind === 'muzzle' || p.kind === 'boom' || p.kind === 'ember' || p.kind === 'spark';
+      const post = p.kind === 'muzzle' || p.kind === 'boom' || p.kind === 'ember' || p.kind === 'spark' || p.kind === 'ring';
       if ((phase === 'post') !== post) continue;
       p.t += dt;
       if (p.t >= p.life) { P.splice(k, 1); continue; }
@@ -606,6 +613,12 @@ export class Renderer {
           ctx.fillStyle = f < 0.3 ? '#fff4c0' : f < 0.6 ? '#ffb040' : '#c04020';
           ctx.globalAlpha = 1 - f;
           ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = 1;
+          break;
+        }
+        case 'ring': {
+          ctx.strokeStyle = p.c || '#8ab8ff'; ctx.lineWidth = 1.5; ctx.globalAlpha = 1 - f;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.size! * (p.size! > 16 ? 0.2 + f * 0.8 : 1), 0, Math.PI * 2); ctx.stroke();
           ctx.globalAlpha = 1;
           break;
         }

@@ -1,5 +1,6 @@
 // Trading with NPC caravans, orbital traders and other players.
 import type { World } from './world';
+import { fxw } from './techfx';
 import type { Item, Pawn } from './types';
 import { ITEMS } from '../data/items';
 import { itemValue, placeItem, makeItem, spawnItem, pawnShortName, itemLabel } from './things';
@@ -15,7 +16,8 @@ export function negotiator(w: World, faction: number): Pawn | null {
 export function priceFactor(w: World, faction: number) {
   const n = negotiator(w, faction);
   const s = n ? skillLevel(n, 'social') : 0;
-  return { buy: clamp(1.5 - s * 0.018, 1.1, 1.5), sell: clamp(0.55 + s * 0.012, 0.55, 0.85) };
+  const tp = fxw(w, faction, 'tradePrice');
+  return { buy: clamp((1.5 - s * 0.018) * (1 - tp), 1.02, 1.5), sell: clamp((0.55 + s * 0.012) * (1 + tp), 0.55, 0.95) };
 }
 export function unitValue(it: Item) { return itemValue({ ...it, count: 1 }); }
 
