@@ -4,7 +4,11 @@
 import { writeFileSync } from 'node:fs';
 import { BUILDINGS } from '../src/data/buildings';
 import { ITEMS, QUALITY_LABELS, QUALITY_STAT } from '../src/data/items';
-import { RECIPES, RESEARCH } from '../src/data/recipes';
+import { RECIPES } from '../src/data/recipes';
+import { RESEARCH, BRANCHES, ERAS, eraOf, EFFECT_INFO } from '../src/data/research';
+import { effectsOf, effectText } from '../src/sim/research';
+import { ACTIONS, TONES, MIN_GAP } from '../src/sim/minds';
+import { PRICE } from '../src/mind/llm';
 import { ANIMALS } from '../src/data/animals';
 import { PLANTS } from '../src/data/plants';
 import { TERRAIN, ROCKS } from '../src/data/terrain';
@@ -83,7 +87,7 @@ table(['Content', 'Count'], [
 P('## Contents', '');
 const SECTIONS = ['First hour: what to try', 'Screen & controls', 'Starting a game', 'Time, seasons & weather', 'Colonists', 'Mood, thoughts & mental breaks',
   'Health & medicine', 'Building', 'Floors, terrain & mining', 'Rooms, beauty & temperature', 'Power', 'Farming & plants', 'Food & cooking',
-  'Crafting & production', 'Items', 'Research tree', 'Combat & defense', 'Animals', 'Events & storytellers', 'Trading, visitors & factions',
+  'Crafting & production', 'Items', 'Research tree', 'AI minds (DeepSeek)', 'Combat & defense', 'Animals', 'Events & storytellers', 'Trading, visitors & factions',
   'Endgame: build a ship', 'Multiplayer', 'Saving', 'Art, sound & presentation', 'Known gaps'];
 SECTIONS.forEach((s, k) => P(`${k + 1}. [${s}](#${s.toLowerCase().replace(/[^a-z0-9 -]/g, '').replace(/ /g, '-')})`));
 P('');
@@ -108,6 +112,8 @@ P(
   '10. **First raid (around day 4–5).** A red letter and alarm. Tap ⚔ *Draft all*, then tap raiders to attack.',
   '    Raiders flee after losing half their group. Downed colonists need rescuing (long-press them).',
   '11. **Multiplayer.** Menu → room code / *Copy invite link* when hosting; a friend on another device lands their own colony on your map.',
+  '12. **AI minds.** Menu → AI minds → turn it on. Every colonist is now played by DeepSeek: watch the thought bubbles, speech',
+  '    bubbles and the Colony → Voices log. (No key? Pick *Offline mind* to try it for free.)',
   '');
 
 // ======================================================================================
@@ -197,6 +203,7 @@ P('**Adulthood**', '');
 table(['Backstory', 'Skills', "Won't do", 'Story'], BACKSTORIES.filter(b => b.kind === 'adult').map(bsRow));
 P('### Social life', '');
 P('Colonists chat, have deep talks, insult each other (Abrasive colonists especially), and form opinions of each other.',
+  'With AI minds on, conversations are chosen and worded by the colonists themselves (see AI minds).',
   'Romance can start between colonists who like each other (lovers want to share a bed; rejection hurts). Insults can escalate',
   'into social fights. Losing a friend or lover is a heavy mood blow. Pets follow their master around.', '');
 
@@ -257,15 +264,17 @@ const bNotes = (d: BuildingDef) => {
   if (d.power?.battery) n.push(`stores ${d.power.battery} Wd`);
   if (d.fuel) n.push(`burns ${d.fuel.perDay} ${label(d.fuel.item)}/day (holds ${d.fuel.cap})`);
   if (d.light) n.push(`light radius ${d.light.radius}${d.light.sun ? ', grows plants' : ''}`);
-  if (d.heat) n.push(d.heat.watts > 0 ? `heats toward ${d.heat.target} °C` : `cools toward ${d.heat.target} °C`);
+  if (d.heat) n.push(d.heat.both ? `heats or cools toward ${d.heat.target} °C` : d.heat.watts > 0 ? `heats toward ${d.heat.target} °C` : `cools toward ${d.heat.target} °C`);
   if (d.cooler) n.push('cools one side, heats the other');
   if (d.vent) n.push('shares temperature between rooms');
   if (d.bench?.recipes.length) n.push(`makes: ${d.bench.recipes.map(r => { const l = RECIPES[r]?.label.replace(/^(Make|Cook|Cut) /, '') || r; return l.charAt(0).toLowerCase() + l.slice(1); }).join(', ')}`);
   if (d.bench?.research) n.push(`research speed ${pct(d.bench.researchSpeed || 1)}`);
   if (d.joy) n.push(`recreation (${d.joy.kind}, ${d.joy.users || 1} users)`);
-  if (d.storage) n.push(`${d.storage.stacks} stacks per cell`);
-  if (d.turret) n.push(`auto-fires ${label(d.turret.weapon)}`);
-  if (d.trap) n.push(`${d.trap.damage} damage, single use`);
+  if (d.storage) n.push(`${d.storage.stacks} stacks per cell${d.storage.cats ? ` (${d.storage.cats.join(', ').replace(/_/g, ' ')})` : ''}`);
+  if (d.turret) n.push(`auto-fires ${label(d.turret.weapon)}${d.turret.power ? ' (needs power)' : ''}`);
+  if (d.trap) n.push(d.trap.explosive ? `explodes (radius ${d.trap.explosive.radius}, ${d.trap.explosive.damage} damage)` : `${d.trap.damage} damage, single use`);
+  if (d.producer) n.push(`produces ${d.producer.items.map(([i, c]) => `${c} ${label(i)}`).join(' or ')} ${d.producer.days === 1 ? 'a day' : `every ${d.producer.days} days`}${d.producer.outdoors ? ', needs open sky' : ''}${d.producer.minTemp !== undefined ? `, above ${d.producer.minTemp} °C` : ''}`);
+  if (d.aura && d.desc) n.push(d.desc);
   if (d.cover) n.push(`cover ${pct(d.cover)}`);
   if (d.growBasin) n.push(`fertility ${pct(d.growBasin.fert)}`);
   if (d.beauty) n.push(`beauty ${d.beauty > 0 ? '+' : ''}${d.beauty}`);
@@ -382,19 +391,87 @@ table(['Item', 'Potency', 'Source'], Object.values(ITEMS).filter(i => i.med).map
 
 // ======================================================================================
 P('## Research tree', '');
-P('Build a research bench, pick a project in the Research tab, and colonists with Research work study it (Intellectual skill).',
-  'Selecting a project highlights its prerequisite chain. Projects marked hi-tech need a hi-tech research bench.', '');
+P(`${Object.keys(RESEARCH).length} projects in ${BRANCHES.length} branches across ${ERAS.length} eras. Build a research bench, open the Research tab and pick a`,
+  'project; colonists with Research work study it (Intellectual skill, research-speed bonuses and multi-analyzers help).',
+  'Projects marked hi-tech need a hi-tech research bench.', '');
+P('**The tree screen.** Columns are tiers grouped into era bands, rows are branch lanes. Drag to pan, pinch (or +/−, or',
+  'the mouse wheel with Ctrl) to zoom, *Fit* to see everything. Each card shows the first thing the project unlocks, its cost,',
+  'progress and queue position. Tap a card: its whole prerequisite chain lights up gold and everything it leads to lights up',
+  'blue, and the panel below lists unlocks (with icons), colony bonuses, requirements and follow-ups. Branch chips filter the',
+  'view; the search box finds projects by name or by what they unlock.', '');
+P('**Queue.** *Research now* starts a project whose prerequisites are done. *Queue path* on a locked project queues every missing',
+  'prerequisite in a valid order, so you can aim for Fusion power on day one and let the colony work through the chain.',
+  'The current project and queue sit above the tree; tap × to drop one.', '');
+P('**Colony bonuses** (★) are permanent passive effects from finished projects. They stack. Everything a project gives is also',
+  'listed in the letter you get when it completes.', '');
+{
+  const tot: Record<string, number> = {};
+  for (const r of Object.values(RESEARCH)) for (const [k, v] of Object.entries(r.effects || {})) tot[k] = (tot[k] || 0) + (v as number);
+  table(['Bonus', 'From', 'All projects together'], Object.keys(EFFECT_INFO).filter(k => tot[k]).map(k => [
+    cap(EFFECT_INFO[k].label), Object.values(RESEARCH).filter(r => r.effects?.[k]).map(r => r.label).join(', '), effectText(k, Math.round(tot[k] * 100) / 100),
+  ]));
+}
 const unlocks = (rid: string) => [
   ...Object.values(BUILDINGS).filter(b => b.research === rid && !b.hidden).map(b => b.label),
-  ...Object.values(RECIPES).filter(r => r.research === rid).map(r => { const l = r.label.replace(/^Make /, ''); return l.charAt(0).toLowerCase() + l.slice(1); }),
-  ...Object.values(ITEMS).filter(i => i.research === rid && !Object.values(RECIPES).some(r => r.research === rid && (r.product === i.id || r.products?.some(p => p.item === i.id)))).map(i => i.label),
+  ...Object.values(RECIPES).filter(r => r.research === rid && !r.product && !r.products?.length).map(r => r.label.charAt(0).toLowerCase() + r.label.slice(1)),
+  ...Object.values(ITEMS).filter(i => i.research === rid).map(i => i.label),
+  ...Object.values(RECIPES).filter(r => r.research === rid).map(r => r.product || r.products?.[0]?.item).filter((x): x is string => !!x && ITEMS[x]?.research !== rid).map(label),
   ...TERRAIN.filter(t => t.research === rid).map(t => t.label),
   ...PLANTS.filter(p => p.research === rid).map(p => p.label),
 ];
-const byTier = Object.values(RESEARCH).sort((a, b) => a.tier - b.tier || a.col - b.col);
-table(['Project', 'Cost', 'Requires', 'Unlocks', 'Description'], byTier.map(r => [
-  r.label + (r.hiTech ? ' (hi-tech)' : ''), r.cost, r.prereqs.map(resLabel).join(', ') || '—', [...new Set(unlocks(r.id))].join(', ') || '—', r.desc,
-]));
+for (const br of BRANCHES) {
+  P(`### ${br.label}`, '');
+  const list = Object.values(RESEARCH).filter(r => r.branch === br.id).sort((a, b) => a.tier - b.tier || a.col - b.col);
+  table(['Project', 'Era', 'Cost', 'Requires', 'Unlocks', 'Colony bonus', 'Description'], list.map(r => [
+    r.label + (r.hiTech ? ' (hi-tech)' : ''), ERAS[eraOf(r.tier)]?.label || '', r.cost, r.prereqs.map(resLabel).join(', ') || '—',
+    [...new Set(unlocks(r.id))].join(', ') || '—', effectsOf(r.id).join(', ') || '—', r.desc,
+  ]));
+}
+P('**New mechanics from the tree**, all simulated: beehives (honey never spoils), meat vats and deep drills that produce on',
+  'their own while powered, moisture pumps that dry marsh into soil, fertilizer pumps (+50% growth nearby), terraformers',
+  '(sand, gravel, marsh and bare stone into rich soil), grain silos (food spoils at half speed), tool cabinets (+6% bench',
+  'speed each, two at most), sleep accelerators and vitals monitors beside beds, sterile floors (clean rooms cut infections;',
+  'filthy rooms raise them), embrasures you can shoot through, blast doors, climate units that heat or cool, IED traps,',
+  'firefoam poppers that smother fires and recharge, powered autocannon and uranium slug turrets, EMP grenades that wreck and',
+  'stun machines but not people, shield belts that soak up bullets until drained, an orbital scanner that guides cargo down',
+  'every few days, a weather controller that holds the sky clear, and the archotech monument (+10 mood nearby).', '');
+
+// ======================================================================================
+P('## AI minds (DeepSeek)', '');
+P('Turn on **Menu → AI minds** and every colonist is played by a language model, DeepSeek (`deepseek-flash`, thinking',
+  'mode off, JSON output). The Work tab stops being orders and becomes advice the colonists may follow.', '');
+P('**What the model sees.** A compact briefing written from the colonist\'s point of view: who they are (backstory, traits',
+  'with their meaning, skills and passions, work they refuse), the time, weather and where they are, needs and the feelings',
+  'behind their mood, injuries, colony stores and research, danger on the map, everyone they know with what they are doing',
+  'and mutual opinions, animals nearby, which kinds of work are actually waiting, their own memories, recent conversation,',
+  'and what just happened to them (someone spoke to them, they got hurt, a letter arrived).', '');
+P('**What it decides.** One JSON object per decision: an inner thought, an action, how long to keep at it, optional words to',
+  'say out loud and an optional note to remember. The game turns that into ordinary jobs.', '');
+table(['Action', 'What happens'], [
+  ['work', 'does one kind of work (' + WORK_TYPES.filter(w => !w.hidden).map(w => w.id).join(', ') + ')'],
+  ['eat / sleep / relax', 'finds food, a bed, or recreation'],
+  ['talk', `walks over to someone and says the chosen line with a tone: ${TONES.join(', ')}. Tones have real effects: jokes can land or fall flat, comfort helps a sad friend, flirting can start a romance or get rebuffed, apologies erase grudges, insults can end in a fistfight`],
+  ['tend / fight / flee', 'doctors someone, attacks a hostile, or runs'],
+  ['go / idle', 'walks to a place (kitchen, fields, a person…) or stands and thinks'],
+]);
+P('**When it decides.** When the current plan runs out, when someone speaks to them, when they are hurt, when danger appears,',
+  `when important news arrives, and at least every few hours. Routine decisions are at least ${Math.round(MIN_GAP / 2500 * 60)} game-minutes apart. While the`,
+  'model is thinking (a little thought cloud over their head) the colonist keeps doing their previous plan.', '');
+P('**What it can\'t override.** The body: colonists still collapse from exhaustion, eat when starving, flee a raider who gets',
+  'too close, have mental breaks, and obey your draft orders. Drafted colonists are yours.', '');
+P('**Watching it.** Speech bubbles over heads; the inspector\'s Mind tab (current thought, plan, memories, recent lines,',
+  'events they haven\'t reacted to yet); Colony → Voices, a log of everything said and thought.', '');
+P('**Where the model runs.**', '');
+table(['Option', 'How'], [
+  ['This server\'s key', 'The deployment calls DeepSeek with its own key through `/api/llm` (a Vercel Edge Function, the Vite dev server, or `server/relay.mjs`). Set `DEEPSEEK_API_KEY`; optionally `LLM_PASSWORD` so only your friends can use it'],
+  ['My own DeepSeek key', 'Paste a key from platform.deepseek.com in the AI minds window. It stays in that browser and goes only to the proxy (or straight to DeepSeek)'],
+  ['Offline mind', 'A small rule-based personality, no network, free. Also takes over automatically if the key is missing or rejected'],
+]);
+P('**Cost.** Prompts are ordered so DeepSeek\'s prefix cache can reuse them (shared rules, then the colonist\'s persona, then',
+  `the changing part), replies are capped short, and thinking mode is off. At list prices ($${PRICE.miss}/M new input tokens, $${PRICE.hit}/M cached,`,
+  `$${PRICE.out}/M output; half price off-peak) a decision costs roughly $0.0002–0.0004 and a colonist makes about 40 decisions per game day:`,
+  'under a cent per colonist per game day. The AI minds window shows tokens and money spent live, lets you cap decisions per',
+  'minute, and stops at a per-session budget (default $1). In multiplayer every player\'s own device runs (and pays for) their colony\'s minds.', '');
 
 // ======================================================================================
 P('## Combat & defense', '');
@@ -505,8 +582,11 @@ P('The host autosaves every in-game day and whenever the app is hidden. Menu →
 // ======================================================================================
 P('## Art, sound & presentation', '');
 P('- All in-game art is pixel art generated in code at startup: terrain with blended edges, cliffs and shadows, plants that grow',
-  '  through visible stages, buildings that link together (walls, sandbags), items, colonists with varied skin, hair, clothing and',
-  '  gear, animals, mechanoids and interface icons.',
+  '  through visible stages, buildings that link together (walls, sandbags), items, animals, mechanoids and interface icons.',
+  '- Colonists are layered 20×28 paper dolls: face with eyes, brows and mouth, 10 hairstyles, beards, freckles and age lines,',
+  '  each clothing layer drawn separately (shirts, trousers, jackets, vests, dusters, parkas, plate, powered armor, shield belts)',
+  '  and a four-frame walk in front, side and back views. Portraits are a separate 32×32 bust whose expression follows mood',
+  '  (happy, neutral, sad with a tear, angry, hurt).',
   '- Day/night lighting with warm fire and lamp glows, per-room darkness, rain, snow, fog and lightning overlays, particles',
   '  (muzzle flashes, blood, sparks, smoke, dust), floating text and screen shake for explosions.',
   '- Sound effects and music are synthesized live. The music drifts through calm frontier progressions and switches to a tense',
@@ -519,8 +599,8 @@ P('Things that exist in the game\'s text or data but are not (fully) simulated y
 for (const [id, gap] of Object.entries(TRAIT_GAPS)) if (gap) P(`- **${TRAITS[id].label}** trait: ${gap}`);
 P(`- Thoughts defined but never triggered: ${[...UNUSED_THOUGHTS].map(id => THOUGHTS[id].label).join(', ')}.`,
   '- Only one inspiration type (work frenzy). A "creativity" inspiration is checked for quality rolls but never granted.',
-  '- Sterile tiles don\'t reduce infections yet (the Sterile materials research says they do), and hospital beds don\'t speed',
-  '  healing; both only add cleanliness/comfort.',
+  '- Hospital beds on their own don\'t speed healing (a vitals monitor beside a bed does, and resting in any bed does).',
+  '- AI minds choose kinds of work, not specific targets: the job system still picks which plant to sow or which item to haul.',
   '- No world map, caravans travelling off-map, prosthetics or surgery.', '');
 
 writeFileSync('FEATURES.md', out.join('\n'));

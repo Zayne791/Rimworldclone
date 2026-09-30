@@ -3,7 +3,8 @@
 A pixel-art colony survival sim for the web, inspired by RimWorld. Your crew crash-lands on a
 frontier world: build shelter, grow food, research technology, survive raids, disease, weather and
 their own mental breakdowns, and finally build a ship to escape. You can play alone or share one
-map with friends, each running your own colony.
+map with friends, each running your own colony. Optionally, every colonist can be played by a
+language model (DeepSeek) that decides what they do, what they say and to whom.
 
 Designed first for **iPad in portrait**, and it plays well on iPhone and desktop too. All in-game
 art is procedurally generated pixel art, drawn in code at startup (only the home-screen icons are
@@ -38,6 +39,41 @@ The game is a static site, so Vercel only needs the build output:
    full-screen play without browser bars.
 
 Every push to `main` redeploys automatically.
+
+## AI minds (DeepSeek)
+
+With **Menu → AI minds** turned on, each colonist is played by DeepSeek (`deepseek-flash`, thinking
+mode off, JSON output). The model gets a first-person briefing (who they are, needs, feelings,
+health, colony state, danger, the people around them, work that's waiting, their memories and what
+was just said to them) and answers with a thought, an action, how long to keep at it, and anything
+they say out loud. The game turns that into ordinary jobs and conversations with real social effects.
+Draft orders, starvation, exhaustion, fleeing and mental breaks still override it.
+
+**Set it up on Vercel** (the key never reaches the browser):
+
+1. Get an API key at [platform.deepseek.com](https://platform.deepseek.com) and add a little credit.
+   DeepSeek is prepaid, so your balance is the most anyone can ever spend.
+2. Vercel → your project → **Settings → Environment Variables**: add `DEEPSEEK_API_KEY`.
+   Optional: `LLM_PASSWORD` (players must type it in the AI minds window before the key is used),
+   `DEEPSEEK_MODEL` (default `deepseek-flash`), `LLM_RATE_PER_MIN` (per-IP limit, default 90).
+3. Redeploy. `api/llm.js` (an Edge Function) proxies requests to DeepSeek with that key.
+4. In the game: Menu → AI minds → *This server's key* → *Turn AI minds on*. *Test connection* checks it.
+
+Other ways to run it:
+
+- **Your own key**: choose *My own DeepSeek key* and paste it; it is stored only in that browser.
+- **Local dev**: copy `.env.example` to `.env.local`, put the key in, `npm run dev`. The dev server
+  serves the same `/api/llm`.
+- **Relay server**: `server/relay.mjs` also serves `/api/llm` when `DEEPSEEK_API_KEY` is set.
+- **Offline mind**: a small rule-based personality with no network. It's free, and it takes over
+  automatically if the key is missing or rejected.
+
+**Cost.** Prompts are ordered for DeepSeek's prefix cache (shared rules → the colonist's persona →
+the changing situation), replies are short and thinking is off. A decision is about 1,300 prompt
+tokens (mostly cached) and 60–80 output tokens, roughly $0.0002–0.0004. A colonist makes about 40
+decisions per game day, so it costs under a cent per colonist per game day, and half that off-peak.
+The AI minds window shows tokens and spend live, caps decisions per minute and stops at a
+per-session budget (default $1). In multiplayer, each player's device runs its own colony's minds.
 
 ## Multiplayer
 
@@ -86,7 +122,7 @@ You can also point at your own PeerJS server with `VITE_PEER_HOST`, `VITE_PEER_P
 - With colonists selected and **drafted**, tap the ground to move and tap an enemy to attack.
 - During a raid, a red **⚔ Draft all** button appears on the colonist bar.
 - Bottom tabs: **Build**, **Orders** (mine, chop, harvest, hunt…), **Zones**, **Work** (priorities
-  and schedules), **Research**, **Colony** (colonists, animals, factions/diplomacy, stats, log), **Menu**.
+  and schedules), **Research**, **Colony** (colonists, voices, animals, factions/diplomacy, stats, log), **Menu**.
 - The hints on the left flag problems; tap one marked **›** to jump to the menu that fixes it.
 - Build and zone tools support drag: drag out walls, rooms, stockpiles and fields.
 
@@ -103,6 +139,7 @@ It is generated from the game data (`npx tsx dev/gen-features.ts`), so rerun tha
 
 - **Colonists** with skills, passions, traits, backstories, needs (food, rest, joy, comfort,
   beauty, temperature), moods, thoughts, relationships, social fights, inspirations and mental breaks.
+  Drawn as layered pixel-art paper dolls with a four-frame walk; portraits change expression with mood.
 - **Health** by body part: cuts, bruises, gunshots, burns, bleeding, infections, diseases, frostbite,
   hypothermia, heatstroke, scars, lost limbs, medicine and doctoring.
 - **Work priorities and schedules**: firefighting, doctoring, cooking, hunting, construction,
@@ -119,7 +156,13 @@ It is generated from the game data (`npx tsx dev/gen-features.ts`), so rerun tha
   and more. Three storytellers and five difficulties.
 - **Combat**: cover, line of sight, accuracy by skill and distance, armor, melee, explosions,
   prisoners, recruiting, rescue.
-- **Research tree**, **trading** (caravans and orbital traders), **save/load** (auto-save in the browser,
+- **Research tree**: 128 projects in 8 branches (agriculture, industry, construction, power,
+  medicine, military, society, space) across 6 eras, from crop rotation to archotech studies.
+  Projects unlock around 45 buildings (beehives, meat vats, deep drills, terraformers, fission and
+  fusion reactors, autocannon turrets, shield belts, weather controllers…), dozens of items and
+  recipes, and stacking colony bonuses. The tree is a pannable, zoomable map with a research queue.
+- **AI minds**: DeepSeek plays each colonist (see above), with speech bubbles and a Voices log.
+- **Trading** (caravans and orbital traders), **save/load** (auto-save in the browser,
   export/import to file).
 
 ## Testing
@@ -133,13 +176,19 @@ Headless simulation tests run in Node with `npx tsx`:
 | `tests/hunt.ts` | hunt → haul → butcher → cook pipeline |
 | `tests/saveload.ts` | save/load round trip mid-game, then keeps simulating |
 | `tests/pathstat.ts`, `tests/pathfail.ts` | pathfinding load and failure sources |
+| `tests/tech.ts` | research data integrity, then builds every unlockable building and checks each mechanic works |
+| `tests/minds.ts [days]` | AI minds soak with the offline mind; checks the colony functions and estimates DeepSeek cost |
+| `node tests/llmproxy.mjs` | `/api/llm` proxy against a fake DeepSeek: request shape, keys, password, limits |
 
 Browser checks use Playwright against `npm run dev` (they expect the dev server on port 5173; the
 multiplayer ones also need a local PeerJS server, `npx peerjs --port 9000 --path /`, or the relay):
 `dev/ui.mjs` walks through every screen on an emulated iPad/iPhone, `dev/mp.mjs` plays a
 two-device multiplayer session including reconnect, `dev/mp-soak.mjs` diffs host and client
 worlds after a long run, `dev/perf.mjs` measures frame rate, and `dev/raid.mjs` exercises the
-raid/draft flow.
+raid/draft flow. `dev/techtree.mjs`, `dev/people.mjs` and `dev/sprites.mjs` screenshot the research
+tree, colonist art and building sprites; `dev/minds.mjs` and `dev/mp-minds.mjs` run AI minds in the
+browser (single player and multiplayer). `dev/fake-deepseek.mjs` stands in for the DeepSeek API
+(`DEEPSEEK_BASE_URL=http://127.0.0.1:9911`) so the whole chain can be tested without a key.
 
 ## Code map
 
@@ -148,12 +197,16 @@ src/
   core/      rng, noise, heap, helpers, constants
   data/      game definitions (terrain, items, plants, buildings, recipes, research, animals, health)
   sim/       simulation: world, map, mapgen, pathfinding, AI, jobs, work, needs,
-             health, combat, rooms, power, environment, storyteller, trading, commands, save
+             health, combat, rooms, power, environment, storyteller, trading, commands, save,
+             techfx (research bonuses), auras (research-tree buildings), minds (AI minds)
   render/    Canvas2D renderer, chunk cache, lighting, particles; art/ = procedural pixel-art sprites
   ui/        DOM UI (HUD, inspector, drawers, tools, windows, menus) + styles
+  mind/      AI minds client side: perception, prompt, DeepSeek client, offline mind, scheduler
   net/       multiplayer transports (WebRTC via PeerJS, WebSocket relay) and host/client sessions
   audio/     synthesized sound effects and generative music (WebAudio, no audio files)
-server/relay.mjs   optional WebSocket relay + static file server
+api/llm.js         Vercel Edge Function: the /api/llm DeepSeek proxy
+server/llmproxy.mjs  the proxy logic, shared by Vercel, the dev server and the relay
+server/relay.mjs   optional WebSocket relay + static file server (+ /api/llm)
 tests/             headless simulation tests (run with tsx)
 dev/               screenshot / device-emulation / multiplayer harness scripts (Playwright)
 ```
