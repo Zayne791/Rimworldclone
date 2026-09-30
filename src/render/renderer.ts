@@ -64,8 +64,19 @@ export class Renderer {
 
   setWorld(w: World) { this.w = w; this.chunks = new ChunkRenderer(w); this.lightCanvas.width = w.map.w; this.lightCanvas.height = w.map.h; this.lightImg = this.lightCtx.createImageData(w.map.w, w.map.h); }
 
+  /** cap on canvas pixels per CSS pixel (lowered automatically on slow devices; pixel art upscales cleanly) */
+  scaleCap = 3;
+  lightSkip = false;
+  setScaleCap(cap: number) {
+    if (cap === this.scaleCap) return;
+    this.scaleCap = cap;
+    const old = this.dpr;
+    this.resize();
+    if (old !== this.dpr) this.cam.zoom *= this.dpr / old;
+  }
+
   resize() {
-    this.dpr = Math.min(window.devicePixelRatio || 1, 3);
+    this.dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 3, this.scaleCap));
     const r = this.canvas.getBoundingClientRect();
     this.vw = Math.max(1, Math.round(r.width * this.dpr)); this.vh = Math.max(1, Math.round(r.height * this.dpr));
     this.canvas.width = this.vw; this.canvas.height = this.vh;
@@ -150,6 +161,16 @@ export class Renderer {
     }
     this.lightCtx.putImageData(this.lightImg, 0, 0);
   }
+  /** true when everything near the view is at (near) full daylight: the multiply pass would be invisible, so skip it */
+  lightIsTrivial(tx0: number, ty0: number, tx1: number, ty1: number): boolean {
+    const m = this.w.map, d = this.lightImg.data;
+    const x0 = Math.max(0, tx0 - 6), y0 = Math.max(0, ty0 - 6), x1 = Math.min(m.w - 1, tx1 + 6), y1 = Math.min(m.h - 1, ty1 + 6);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const o = (y * m.w + x) * 4;
+      if (d[o] < 250 || d[o + 1] < 247 || d[o + 2] < 238) return false;
+    }
+    return true;
+  }
 
   // ---------- main draw ----------
   draw(dt: number) {
@@ -224,11 +245,13 @@ export class Renderer {
     this.drawSelection(ctx);
     this.opts.overlay?.drawWorld?.(ctx, this);
     // lighting
-    if (this.frameNo % 8 === 1 || this.time - this.lastLight > 0.3) { this.updateLight(); this.lastLight = this.time; }
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(this.lightCanvas, 0, 0, m.w, m.h, 0, 0, m.w * TILE, m.h * TILE);
-    ctx.imageSmoothingEnabled = false;
+    if (this.frameNo % 8 === 1 || this.time - this.lastLight > 0.3) { this.updateLight(); this.lastLight = this.time; this.lightSkip = this.lightIsTrivial(tx0, ty0, tx1, ty1); }
+    if (!this.lightSkip) {
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(this.lightCanvas, 0, 0, m.w, m.h, 0, 0, m.w * TILE, m.h * TILE);
+      ctx.imageSmoothingEnabled = false;
+    }
     ctx.globalCompositeOperation = 'lighter';
     this.drawGlows(ctx, tx0, ty0, tx1, ty1);
     ctx.globalCompositeOperation = 'source-over';

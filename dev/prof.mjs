@@ -1,0 +1,24 @@
+// CPU-profile a running game for a few seconds and print the hottest functions (self time).
+import { chromium, devices } from 'playwright';
+const url = process.argv[2] || 'http://127.0.0.1:8787/';
+const b = await chromium.launch();
+const ctx = await b.newContext({ ...devices['iPad Pro 11'] });
+const p = await ctx.newPage();
+await p.goto(url);
+await p.waitForSelector('[data-m="new"]');
+await p.tap('[data-m="new"]'); await p.tap('[data-m="next"]');
+await p.waitForSelector('[data-m="site"]', { timeout: 20000 }); await p.tap('[data-m="site"]');
+await p.waitForSelector('[data-m="go"]'); await p.tap('[data-m="go"]');
+await p.waitForFunction(() => window.__game?.world, null, { timeout: 20000 });
+await p.waitForTimeout(2000);
+const cdp = await ctx.newCDPSession(p);
+await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 });
+await cdp.send('Profiler.start');
+await p.waitForTimeout(5000);
+const { profile } = await cdp.send('Profiler.stop');
+const self = new Map(); const byId = new Map(profile.nodes.map(n => [n.id, n]));
+const dt = profile.timeDeltas; const total = dt.reduce((a, b) => a + b, 0);
+profile.samples.forEach((id, k) => { const n = byId.get(id); const key = `${n.callFrame.functionName || '(anon)'} ${n.callFrame.url.split('/').pop()}:${n.callFrame.lineNumber}`; self.set(key, (self.get(key) || 0) + (dt[k] || 0)); });
+const top = [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30);
+for (const [k, v] of top) console.log((v / total * 100).toFixed(1).padStart(5) + '%  ' + k);
+await b.close();

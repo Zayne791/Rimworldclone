@@ -255,6 +255,9 @@ function moreWindow(ui: UI) {
     <div class="row"><button class="btn sm ${a.muted ? 'on' : ''}" data-a="w:mute">${a.muted ? 'Unmute' : 'Mute all'}</button></div>
     <h3>Display</h3>
     <div class="row wrap"><button class="btn sm ${g.view.labels ? 'on' : ''}" data-a="w:view" data-v="labels">Names</button><button class="btn sm ${g.view.zones ? 'on' : ''}" data-a="w:view" data-v="zones">Zones</button><button class="btn sm ${g.view.temps ? 'on' : ''}" data-a="w:view" data-v="temps">Temperature</button><button class="btn sm ${g.view.roofs ? 'on' : ''}" data-a="w:view" data-v="roofs">Roofs</button></div>
+    <h3>Graphics</h3>
+    <div class="row wrap">${([['auto', 'Auto'], ['sharp', 'Sharp'], ['fast', 'Fast']] as const).map(([k, l]) => `<button class="btn sm ${g.gfx === k ? 'on' : ''}" data-a="w:gfx" data-v="${k}">${l}</button>`).join('')}</div>
+    <div class="tiny dim">Auto lowers resolution on slower devices to keep the game smooth. Now ${g.renderer.dpr}×.</div>
     <div class="small dim" style="margin-top:8px">${GAME_NAME} v${VERSION} · ${Math.round(1000 / Math.max(1, g.frameTimes.reduce((s, x) => s + x, 0) / Math.max(1, g.frameTimes.length)))} fps budget · ${w.pawns.size} pawns</div>`;
   ui.showModal('more', `<div class="wh"><h2>Menu</h2>${closeBtn}</div><div class="wb">${body}</div><div class="wf"><button class="btn bad" data-a="w:exit">Exit to main menu</button></div>`, 'narrow');
 }
@@ -446,6 +449,7 @@ export function windowAction(ui: UI, a: string, el: HTMLElement) {
     case 'help': renderWindow(ui, 'help'); break;
     case 'mute': g.audio.muted = !g.audio.muted; g.audio.applyVolumes(); g.audio.saveSettings(); again(); break;
     case 'view': (g.view as any)[d.v!] = !(g.view as any)[d.v!]; again(); break;
+    case 'gfx': g.setGfx(d.v as any); again(); break;
     case 'copylink': { const url = location.origin + location.pathname + '?join=' + encodeURIComponent(g.net?.roomCode || ''); navigator.clipboard?.writeText(url).then(() => ui.toast('Invite link copied', 'good')).catch(() => prompt('Copy this link:', url)); break; }
     case 'exit': if (confirm(g.isHost ? 'Exit to main menu? The game autosaves each day; save first if you want your latest progress.' : 'Leave this game?')) { ui.closeModal(); g.onExit?.(); } break;
   }

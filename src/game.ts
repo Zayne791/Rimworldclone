@@ -69,6 +69,7 @@ export class Game {
       faction, selection: this.selection, zones: false, roofs: false, home: false, temps: false, labels: true,
       get overlay() { return self.tool ? { drawWorld: (ctx: CanvasRenderingContext2D, r: Renderer) => self.tool?.drawWorld?.(ctx, r) } : null; },
     } as any);
+    if (this.gfx === 'fast') this.renderer.setScaleCap(1);
     this.input = new Input(this, canvas);
     this.saveSlot = 'auto:' + world.seed;
     const pl = world.playerByFaction(faction);
@@ -106,8 +107,30 @@ export class Game {
     return s;
   }
 
+  /** graphics: 'auto' starts sharp and drops resolution if frames are slow; 'sharp' = native; 'fast' = 1x */
+  gfx: 'auto' | 'sharp' | 'fast' = (() => { try { return (localStorage.getItem('sf_gfx') as any) || 'auto'; } catch { return 'auto'; } })();
+  private slow = { n: 0, bad: 0, simMs: 0, t: 0 };
+  setGfx(mode: 'auto' | 'sharp' | 'fast') {
+    this.gfx = mode;
+    try { localStorage.setItem('sf_gfx', mode); } catch { /* */ }
+    this.renderer.setScaleCap(mode === 'fast' ? 1 : 3);
+    this.slow = { n: 0, bad: 0, simMs: 0, t: 0 };
+  }
+  private watchFrameRate(delta: number) {
+    if (this.gfx !== 'auto' || document.hidden) return;
+    const s = this.slow;
+    if (delta > 250) return; // tab switch / hitch
+    if (delta - s.simMs > 27) s.bad++;
+    s.n++; s.t += delta;
+    if (s.t < 2000) return;
+    const r = this.renderer;
+    if (s.bad > s.n * 0.6 && r.dpr > 1) r.setScaleCap(r.dpr > 1.5 ? 1.5 : 1);
+    s.n = 0; s.bad = 0; s.t = 0;
+  }
+
   frame(now: number) {
     const dt = Math.min(0.1, (now - this.last) / 1000);
+    this.watchFrameRate(now - this.last);
     this.last = now;
     const w = this.world;
     const t0 = performance.now();
@@ -127,6 +150,7 @@ export class Game {
           if (performance.now() - t0 > budget) { this.acc = 0; break; }
         }
       }
+      this.slow.simMs = performance.now() - t0;
       fx = w.fx; w.fx = [];
       this.net?.hostFrame(fx);
       if (w.day !== this.lastDay) { this.lastDay = w.day; this.autosave(); }

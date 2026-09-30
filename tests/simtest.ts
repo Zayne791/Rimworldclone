@@ -8,6 +8,7 @@ import { ITEMS } from '../src/data/items';
 import { RESEARCH } from '../src/data/recipes';
 import { canStartResearch } from '../src/sim/research';
 import { pawnHostileTo } from '../src/sim/combat';
+import { PATH_STATS } from '../src/sim/path';
 
 const days = +(process.argv[2] || 6);
 const size = +(process.argv[3] || 120);
@@ -72,7 +73,13 @@ let campfire = [...w.buildings.values()].find(b => b.def === 'campfire');
 const tStart = Date.now();
 let lastReport = 0;
 let errors = 0;
+// PROF_FROM=<day>: CPU-profile the simulation from that day on (writes test-output/sim.cpuprofile)
+import { Session } from 'node:inspector/promises';
+import { writeFileSync } from 'node:fs';
+const profFrom = process.env.PROF_FROM ? +process.env.PROF_FROM : -1;
+let prof: Session | null = null;
 for (let t = 0; t < days * TICKS_PER_DAY; t++) {
+  if (profFrom >= 0 && !prof && w.tick >= profFrom * TICKS_PER_DAY) { prof = new Session(); prof.connect(); await prof.post('Profiler.enable'); await prof.post('Profiler.start'); }
   try { simTick(w); } catch (e) { errors++; if (errors < 5) console.error('TICK ERROR', w.tick, e); if (errors > 50) break; }
   if (w.tick % 300 === 0) autoPlayer();
   if (!campfire) { campfire = [...w.buildings.values()].find(b => b.def === 'campfire'); if (campfire && !campfire.bills?.length) applyCommand(w, F, { c: 'bill', op: 'add', bench: campfire.id, recipe: 'cook_simple' }); }
@@ -82,11 +89,13 @@ for (let t = 0; t < days * TICKS_PER_DAY; t++) {
     const bp = [...w.blueprints.values()].length;
     const meals = [...w.items.values()].filter(i => ITEMS[i.def].cat === 'meal').reduce((s, i) => s + i.count, 0);
     const wood = [...w.items.values()].filter(i => i.def === 'wood').reduce((s, i) => s + i.count, 0);
+    console.log(`   path: calls ${PATH_STATS.calls} fails ${PATH_STATS.fails} nodes ${PATH_STATS.nodes} (${(PATH_STATS.nodes / Math.max(1, PATH_STATS.calls)).toFixed(0)}/call)`); PATH_STATS.calls = PATH_STATS.fails = PATH_STATS.nodes = 0;
     console.log(`day ${(w.tick / TICKS_PER_DAY).toFixed(1)} h${w.hour.toFixed(1)} temp ${w.outdoorTemp.toFixed(1)} weather ${w.weather.cur} | cols ${colonists.length} bp ${bp} meals ${meals} wood ${wood} bld ${w.buildings.size} pawns ${w.pawns.size} lords ${w.lords.size} research ${JSON.stringify(w.research[F].prog)} done ${w.research[F].done}`);
     for (const b of w.blueprints.values()) console.log('   BP', b.def, b.x, b.y, JSON.stringify(b.delivered), b.work.toFixed(0));
     for (const p of colonists) console.log(`   ${p.name.nick.padEnd(10)} ${(p.job?.type || '-').padEnd(8)} ${jobLabel(w, p).padEnd(28)} food ${p.needs.food.toFixed(2)} rest ${p.needs.rest.toFixed(2)} joy ${p.needs.joy.toFixed(2)} mood ${p.needs.mood.toFixed(2)} hp ${p.hediffs.length} ${p.downed ? 'DOWNED' : ''} @${p.x},${p.y}`);
   }
 }
+if (prof) { const { profile } = await prof.post('Profiler.stop'); writeFileSync('test-output/sim.cpuprofile', JSON.stringify(profile)); }
 const el = (Date.now() - tStart) / 1000;
 console.log(`ran ${days} days in ${el.toFixed(1)}s => ${(days * TICKS_PER_DAY / el).toFixed(0)} ticks/s, errors ${errors}`);
 const letters = w.letters.map(l => `[d${(l.tick / TICKS_PER_DAY).toFixed(1)}] ${l.title}`);

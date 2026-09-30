@@ -1,7 +1,7 @@
 // Pawn movement along paths, door handling, bashing obstacles.
 import type { World } from './world';
 import type { Pawn } from './types';
-import { findPath, pathOptsFor, BASE_COST } from './path';
+import { findPath, pathOptsFor, BASE_COST, PATH_STATS } from './path';
 import { IMPASSABLE } from './map';
 import { moveSpeed } from './stats';
 import { BUILDINGS } from '../data/buildings';
@@ -36,7 +36,7 @@ export function moveTo(w: World, p: Pawn, x: number, y: number, touch = false, t
     if (c._pathFailT && c._pk === key && w.tick - c._pathFailT < 120) return 'fail';
     const path = findPath(w, p.x, p.y, x, y, pathOptsFor(w, p), touch, tw, th);
     c._pk = key;
-    if (!path) { c._pathFailT = w.tick; p.path = null; return 'fail'; }
+    if (!path) { c._pathFailT = w.tick; p.path = null; if (PATH_STATS.failBy) { const k = `${p.race}${p.faction >= 10 ? '(col)' : ''}:${p.job?.type}${p.lord ? ':lord' : ''}`; PATH_STATS.failBy[k] = (PATH_STATS.failBy[k] || 0) + 1; } return 'fail'; }
     c._pathFailT = 0;
     p.path = path; p.pi = 0;
     if (!path.length) return 'arrived';

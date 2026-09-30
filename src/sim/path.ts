@@ -62,6 +62,9 @@ function cellCost(w: World, i: number, o: PathOpts, wallBash: boolean): number {
  * A* from (sx,sy) to goal. goal can be exact cell, or touch mode (reach any cell adjacent to target rect).
  * Returns list of cell indices (excluding start) or null.
  */
+/** debug counters (cheap; read by tests) */
+export const PATH_STATS: { calls: number; fails: number; nodes: number; failBy?: Record<string, number> } = { calls: 0, fails: 0, nodes: 0 };
+
 export function findPath(w: World, sx: number, sy: number, tx: number, ty: number, o: PathOpts, touch = false, tw = 1, th = 1): number[] | null {
   const m = w.map;
   const W = m.w, H = m.h;
@@ -77,13 +80,18 @@ export function findPath(w: World, sx: number, sy: number, tx: number, ty: numbe
     const dy = y < ty ? ty - y : y > ty + th - 1 ? y - (ty + th - 1) : 0;
     return dx <= 1 && dy <= 1;
   };
+  PATH_STATS.calls++;
   if (isGoal(sx, sy)) return [];
+  // hopeless searches flood the whole region before failing: rule them out with the region maps first
+  const reachable = m.maybeReachable(start, tx, ty, touch, tw, th, !!o.animal && o.faction === 0);
+  if (!o.bash && !reachable) { PATH_STATS.fails++; return null; }
   const cx = tx + (tw - 1) / 2, cy = ty + (th - 1) / 2;
   const hFn = (x: number, y: number) => {
     const dx = Math.abs(x - cx), dy = Math.abs(y - cy);
     return BASE_COST * (dx > dy ? dx + 0.4142 * dy : dy + 0.4142 * dx);
   };
-  for (let pass = 0; pass < (o.bash ? 2 : 1); pass++) {
+  // walled-off goal for a wall-basher: skip the doomed no-bash pass
+  for (let pass = o.bash && !reachable ? 1 : 0; pass < (o.bash ? 2 : 1); pass++) {
     const wallBash = pass === 1;
     if (pass === 1) { gen++; }
     heap.clear();
@@ -104,6 +112,7 @@ export function findPath(w: World, sx: number, sy: number, tx: number, ty: numbe
         return out;
       }
       if (++nodes > maxNodes) break;
+      PATH_STATS.nodes++;
       const g0 = gScore[cur];
       for (let d = 0; d < 8; d++) {
         const dx = d < 4 ? (d === 0 ? 1 : d === 1 ? -1 : 0) : (d === 4 || d === 6 ? 1 : -1);
@@ -131,6 +140,7 @@ export function findPath(w: World, sx: number, sy: number, tx: number, ty: numbe
       }
     }
   }
+  PATH_STATS.fails++;
   return null;
 }
 

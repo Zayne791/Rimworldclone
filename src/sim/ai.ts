@@ -239,7 +239,7 @@ export function wanderJob(w: World, p: Pawn, r: number, cx?: number, cy?: number
     if (home && k < 8 && dist2(x, y, home[0], home[1]) > leash * leash) continue;
     const i = m.idx(x, y);
     if (!m.passable(i) || m.fire[i] || m.isWater(i)) continue;
-    if (!m.connected(m.idx(p.x, p.y), i, false)) continue;
+    if (!m.maybeReachable(m.idx(p.x, p.y), x, y, false, 1, 1, p.faction === 0 && p.race !== 'human')) continue;
     return mkJob('wander', { c: i, count: w.rng.int(60, 240) });
   }
   return mkJob('wait', { count: 60 });
@@ -348,14 +348,16 @@ function animalThink(w: World, p: Pawn) {
   if (p.lord) { const j = lordPawnThink(w, p); if (j) assignJob(w, p, j); return; }
   const m = w.map;
   const manhunter = (p.animal?.manhunter || 0) > w.tick;
+  const here = m.idx(p.x, p.y), wild = p.faction === 0;
+  const canReach = (o: Pawn) => m.maybeReachable(here, o.x, o.y, true, 1, 1, wild);
   if (manhunter || (p.target && !p.fleeing && ad.predator)) {
     const t = p.target ? w.pawns.get(p.target) : null;
-    let e = t && !t.dead && !t.downed ? t : null;
+    let e = t && !t.dead && !t.downed && canReach(t) ? t : null;
     if (!e) {
       let bd = 60 * 60;
       for (const o of w.pawns.values()) {
         if (o.dead || o.downed || o.id === p.id) continue;
-        if (!pawnHostileTo(w, p, o)) continue;
+        if (!pawnHostileTo(w, p, o) || !canReach(o)) continue;
         const d = dist2(p.x, p.y, o.x, o.y);
         if (d < bd) { bd = d; e = o; }
       }
@@ -386,14 +388,14 @@ function animalThink(w: World, p: Pawn) {
           if (o.dead || o.id === p.id || o.race === p.race || o.race === 'human' || !isAnimal(o) || o.animal?.tamed && w.day < 5) continue;
           if (bodySize(o) > bodySize(p) * 1.2) continue;
           const d = dist2(p.x, p.y, o.x, o.y);
-          if (d < bd) { bd = d; prey = o; }
+          if (d < bd && canReach(o)) { bd = d; prey = o; }
         }
         if (!prey && p.needs.food < 0.06 && w.day >= 4 && w.rng.chance(0.08)) {
           let bh = 30 * 30;
           for (const o of w.pawns.values()) {
             if (o.dead || o.race !== 'human' || o.lord) continue;
             const d = dist2(p.x, p.y, o.x, o.y);
-            if (d < bh) { bh = d; prey = o; }
+            if (d < bh && canReach(o)) { bh = d; prey = o; }
           }
         }
         if (!prey && p.needs.food < 0.1) { p.needs.food = 0.35; }

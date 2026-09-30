@@ -43,6 +43,8 @@ export class GameMap {
   // derived caches
   cost: Uint16Array; door: Int32Array; sight: Uint8Array;
   region: Int32Array; regionDirty = true;
+  /** like region, but doors split regions (for wild animals, which can't open colony doors) */
+  regionND: Int32Array;
   roomId: Int32Array; roomsDirty = true;
   light: Float32Array; sunLamp: Uint8Array; lightDirty = true;
   lightColor: Uint8Array; // rgb per tile for artificial light
@@ -62,7 +64,7 @@ export class GameMap {
     this.bld = new Int32Array(n); this.bp = new Int32Array(n); this.bpFloor = new Int32Array(n); this.fire = new Int32Array(n);
     this.items = new Array(n); this.pawns = new Array(n);
     this.cost = new Uint16Array(n); this.door = new Int32Array(n); this.sight = new Uint8Array(n);
-    this.region = new Int32Array(n); this.roomId = new Int32Array(n);
+    this.region = new Int32Array(n); this.regionND = new Int32Array(n); this.roomId = new Int32Array(n);
     this.light = new Float32Array(n); this.sunLamp = new Uint8Array(n); this.lightColor = new Uint8Array(n * 3);
     this.chunksW = Math.ceil(w / CHUNK); this.chunksH = Math.ceil(h / CHUNK);
     this.chunkDirty = new Uint8Array(this.chunksW * this.chunksH).fill(3);
@@ -195,22 +197,37 @@ export class GameMap {
   ensureRegions() {
     if (!this.regionDirty) return;
     this.regionDirty = false;
-    const r = this.region; r.fill(0);
-    const w = this.w, h = this.h;
+    this.flood(this.region, false);
+    this.flood(this.regionND, true);
+  }
+  private flood(r: Int32Array, doorsBlock: boolean) {
+    r.fill(0);
+    const w = this.w, h = this.h, cost = this.cost, door = this.door;
+    const open = (j: number) => cost[j] !== IMPASSABLE && !(doorsBlock && door[j]);
     const stack: number[] = [];
     let id = 0;
     for (let s = 0; s < this.n; s++) {
-      if (r[s] || this.cost[s] === IMPASSABLE) continue;
+      if (r[s] || !open(s)) continue;
       id++; r[s] = id; stack.push(s);
       while (stack.length) {
         const i = stack.pop()!;
         const x = i % w, y = (i / w) | 0;
-        if (x > 0) { const j = i - 1; if (!r[j] && this.cost[j] !== IMPASSABLE) { r[j] = id; stack.push(j); } }
-        if (x < w - 1) { const j = i + 1; if (!r[j] && this.cost[j] !== IMPASSABLE) { r[j] = id; stack.push(j); } }
-        if (y > 0) { const j = i - w; if (!r[j] && this.cost[j] !== IMPASSABLE) { r[j] = id; stack.push(j); } }
-        if (y < h - 1) { const j = i + w; if (!r[j] && this.cost[j] !== IMPASSABLE) { r[j] = id; stack.push(j); } }
+        if (x > 0) { const j = i - 1; if (!r[j] && open(j)) { r[j] = id; stack.push(j); } }
+        if (x < w - 1) { const j = i + 1; if (!r[j] && open(j)) { r[j] = id; stack.push(j); } }
+        if (y > 0) { const j = i - w; if (!r[j] && open(j)) { r[j] = id; stack.push(j); } }
+        if (y < h - 1) { const j = i + w; if (!r[j] && open(j)) { r[j] = id; stack.push(j); } }
       }
     }
+  }
+  /** quick "could a path exist" test used to skip hopeless A* searches (tw/th = target rect, touch = adjacent ok) */
+  maybeReachable(a: number, tx: number, ty: number, touch: boolean, tw: number, th: number, doorsBlock: boolean): boolean {
+    this.ensureRegions();
+    const R = doorsBlock ? this.regionND : this.region;
+    const ra = R[a];
+    if (!ra) return true; // standing somewhere odd (doorway, rubble): let A* decide
+    const x0 = touch ? tx - 1 : tx, y0 = touch ? ty - 1 : ty, x1 = touch ? tx + tw : tx, y1 = touch ? ty + th : ty;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (this.inb(x, y) && R[y * this.w + x] === ra) return true;
+    return false;
   }
   /** can a pawn standing at a reach cell b (or any passable neighbor of b if b is impassable) */
   connected(a: number, b: number, touch = true): boolean {
