@@ -1,5 +1,6 @@
 // Per-pawn tick and the "think tree" that picks what each pawn does next.
 import { mindThink, mindTick, mindEvent, newMind } from './minds';
+import { leaderMode, findDutyWork, leaderTick, dutyJobDone } from './leader';
 import type { World } from './world';
 import type { Pawn, Job, Building } from './types';
 import { DRIVERS, mkJob, dropCarry, needsBedRest, randomEdgeCell, type Status } from './jobs';
@@ -13,7 +14,7 @@ import { BUILDINGS } from '../data/buildings';
 import { ANIMALS } from '../data/animals';
 import { ITEMS } from '../data/items';
 import { PLANTS } from '../data/plants';
-import { TICKS_PER_DAY } from '../core/constants';
+import { TICKS_PER_DAY, TICKS_PER_HOUR } from '../core/constants';
 import { dist, dist2 } from '../core/util';
 import { lordPawnThink } from './lords';
 import { makeItem, placeItem, pawnShortName } from './things';
@@ -23,6 +24,7 @@ import { bfsNearest, lineOfSight } from './path';
 
 export function endJob(w: World, p: Pawn, st: Status) {
   const j = p.job;
+  if (j && st === 'done' && j.data?.duty) dutyJobDone(w, p, j);
   if (j) {
     if (st === 'fail' && p.carry && j.type !== 'eat') dropCarry(w, p);
     if (j.type === 'eat' && st === 'fail' && p.carry) dropCarry(w, p);
@@ -68,6 +70,7 @@ export function pawnTick(w: World, p: Pawn) {
     else if (p.race === 'human' && w.isColonist(p)) {
       if (!p.mind && w.playerByFaction(p.faction)?.minds) p.mind = newMind();
       if (p.mind) mindTick(w, p);
+      if (p.mind && (w.tick + p.id) % 2500 < 250) leaderTick(w, p);
     }
   }
   if (p.bubble && p.bubble.t < w.tick) p.bubble = undefined;
@@ -142,6 +145,8 @@ export function think(w: World, p: Pawn) {
     if (bed) { w.reserve('t' + bed.id, p.id); assignJob(w, p, mkJob('rest', { t: bed.id })); return; }
   }
   // AI minds: a language model picks the goal; routine below only fills gaps while it thinks
+  const talking = p.mind?.lead?.talking;
+  if (talking && w.tick - talking < TICKS_PER_HOUR * 3 && !p.drafted) { const j = mkJob('wait', { count: 250 }); j.label = 'talking with the leader'; assignJob(w, p, j); return; }
   if (p.mind?.on && mindThink(w, p)) return;
   const hour = Math.floor(w.hour);
   const sched = p.schedule[hour] || 'A';
@@ -157,7 +162,7 @@ export function think(w: World, p: Pawn) {
   // gear optimization
   if ((w.tick + p.id * 13) % 1500 < 60) { const j = gearJob(w, p); if (j) { assignJob(w, p, j); return; } }
   if (sched !== 'J') {
-    const job = findWork(w, p);
+    const job = p.mind?.on && leaderMode(w, p.faction) ? findDutyWork(w, p) : findWork(w, p);
     if (job) { assignJob(w, p, job); return; }
   }
   if (p.needs.joy < 0.9) { const j = joyJob(w, p); if (j) { assignJob(w, p, j); return; } }

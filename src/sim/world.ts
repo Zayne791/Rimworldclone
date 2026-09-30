@@ -32,6 +32,8 @@ export interface PlayerInfo {
   startX?: number; startY?: number;
   ping?: number;
   minds?: boolean;       // colonists are driven by language-model minds
+  leader?: boolean;      // with minds on: colonists only do work agreed with the player (default true)
+  leaderIntro?: boolean; // the "you lead, they decide" letter was shown
 }
 
 export interface ResearchState { cur: string | null; prog: Record<string, number>; done: string[]; queue?: string[] }

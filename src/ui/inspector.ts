@@ -1,5 +1,7 @@
 // Inspector sheet: detailed info + action buttons ("gizmos") for the current selection.
 import { mindTab } from './mindsui';
+import { openTalk } from './talkui';
+import { lead, leaderMode, workLabel } from '../sim/leader';
 import type { UI } from './ui';
 import { itemIconURL, portraitURL } from './ui';
 import type { Pawn, Building, Item, Blueprint, Zone } from '../sim/types';
@@ -70,6 +72,10 @@ function pawnInsp(ui: UI, p: Pawn): InspResult {
   if (tab === 'overview') {
     body += `<div class="row"><span class="chip">${escapeHtml(jobLabel(w, p))}</span>${p.drafted ? '<span class="chip bad">drafted</span>' : ''}${p.inspired ? '<span class="chip accent">★ inspired</span>' : ''}${p.mind?.on ? `<span class="chip" data-a="sheettab" data-v="mind">💭 ${g.minds.isThinking(p.id) ? 'thinking…' : 'own mind'}</span>` : ''}</div>`;
     if (p.mind?.on && p.mind.thought) body += `<div class="mind-thought small">“${escapeHtml(p.mind.thought)}”</div>`;
+    if (own && p.mind?.on && leaderMode(w, p.faction)) {
+      const L = lead(p);
+      body += `<div class="small lead-sum">Trust <b class="${L.trust >= 0 ? 'good' : 'bad'}">${L.trust > 0 ? '+' : ''}${Math.round(L.trust)}</b> · ${L.duties.length ? `does ${L.duties.map(d => escapeHtml(workLabel(d.work).toLowerCase())).join(', ')}` : '<span class="warn">no agreed work</span>'}${L.audience ? ` · <span class="accent" data-a="insp:talk">💬 wants to talk</span>` : ''}</div>`;
+    }
     body += `<div class="need"><span>Health</span>${bar(hp, needCol(hp))}<span class="small">${pct(hp)}</span></div>`;
     if (human && !p.guest?.prisoner || own) {
       const n = p.needs;
@@ -151,6 +157,7 @@ function pawnInsp(ui: UI, p: Pawn): InspResult {
   // gizmos
   let gz = '';
   if (own && human && !p.guest) {
+    if (p.mind?.on && g.minds.enabled) gz += giz('talk', 'chat', p.mind.lead?.audience ? '💬 Talk!' : 'Talk', 'good');
     gz += giz('draft', 'draft', p.drafted ? 'Undraft' : 'Draft', p.drafted ? 'bad' : '');
     if (p.drafted) gz += giz('firewill', 'target', p.fireAtWill ? 'Fire at will' : 'Hold fire', p.fireAtWill ? 'on' : '');
     gz += giz('boxsel', 'select', 'Select group');
@@ -346,6 +353,7 @@ export function inspectorAction(ui: UI, a: string, el: HTMLElement) {
   const own = pawns.filter(p => p.faction === g.faction);
   switch (a) {
     case 'draft': g.cmd({ c: 'draft', pawns: [t.id], on: !t.drafted }); break;
+    case 'talk': openTalk(ui, [t.id]); break;
     case 'firewill': g.cmd({ c: 'firewill', pawns: [t.id], on: !t.fireAtWill }); break;
     case 'draftall': g.cmd({ c: 'draft', pawns: own.map(p => p.id), on: !own.every(p => p.drafted) }); break;
     case 'firewillall': g.cmd({ c: 'firewill', pawns: own.map(p => p.id), on: true }); break;

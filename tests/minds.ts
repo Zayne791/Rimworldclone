@@ -36,6 +36,7 @@ applyCommand(w, F, { c: 'build', def: 'research_bench', stuff: 'wood', rot: 0, c
 applyCommand(w, F, { c: 'research', id: 'crop_rotation' });
 applyCommand(w, F, { c: 'build', def: 'bed', stuff: 'wood', rot: 0, cells: [[cx - 8, cy + 2], [cx - 6, cy + 2], [cx - 4, cy + 2], [cx - 10, cy + 2]] });
 const r = applyCommand(w, F, { c: 'minds', on: true });
+applyCommand(w, F, { c: 'leadermode', on: process.env.LEADER === '1' }); // classic autonomy here; tests/leader.ts covers leader mode
 ok(r.ok !== false && w.colonists(F).every(p => p.mind?.on), 'minds command gives every colonist a mind');
 
 let decisions = 0, chars = 0, maxChars = 0, errors = 0;

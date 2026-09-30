@@ -27,7 +27,19 @@ const host = await A.evaluate(() => { const g = window.__game, w = g.world; cons
 const client = await B.evaluate(() => { const g = window.__game, w = g.world; return { calls: g.minds.stats.calls, lines: w.talk.length, speech: w.colonists(g.faction).filter(p => p.speech).length }; });
 console.log('host view', JSON.stringify(host));
 console.log('client', JSON.stringify(client));
-const okAll = host.minds.every(m => m.n > 0) && host.lines > 0 && client.lines > 0 && !host.hostMinds;
+// leader mode over the network: the client talks to its colonist, the host applies what was agreed
+await B.evaluate(async () => { const g = window.__game; const { openTalk } = await import('/src/ui/talkui.ts'); const c = g.world.colonists(g.faction)[0]; window.__tk = openTalk(g.ui, [c.id]); window.__tkId = c.id; });
+await B.waitForTimeout(2500);
+await B.evaluate(() => window.__tk.send('Could you please build the walls for us every day? We need shelter because winter is coming, and I would appreciate it.'));
+await B.waitForTimeout(3500);
+await B.screenshot({ path: 'test-output/mp-talk.png' });
+await B.evaluate(() => window.__tk.close());
+await B.waitForTimeout(1500);
+const id = await B.evaluate(() => window.__tkId);
+const talk = await A.evaluate((id) => { const L = window.__game.world.pawns.get(id)?.mind?.lead; return { chat: L?.chat.length || 0, duties: L?.duties.map(d => d.work), talking: L?.talking || 0 }; }, id);
+const seen = await B.evaluate((id) => window.__game.world.pawns.get(id)?.mind?.lead?.chat.length || 0, id);
+console.log('talk on host', JSON.stringify(talk), 'replicated to client', seen);
+const okAll = host.minds.every(m => m.n > 0) && host.lines > 0 && client.lines > 0 && !host.hostMinds && talk.chat >= 2 && seen >= 2 && !talk.talking;
 console.log(okAll ? 'mp minds ok' : 'MP MINDS FAIL');
 console.log(errs.slice(0, 10).join('\n') || 'no errors');
 await b.close();

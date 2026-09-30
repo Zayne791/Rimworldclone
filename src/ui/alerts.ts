@@ -6,6 +6,7 @@ import { countResource } from '../sim/zones';
 import { needsTending } from '../sim/health';
 import { pawnShortName } from '../sim/things';
 import { breakThresholds } from '../sim/mood';
+import { leaderMode } from '../sim/leader';
 
 export interface Alert { text: string; crit: boolean; x?: number; y?: number; id?: number; tab?: string; cat?: string }
 
@@ -53,5 +54,19 @@ export function computeAlerts(g: Game): Alert[] {
   const unpowered = blds.find(b => BUILDINGS[b.def].power?.use && b.on !== false && !b.powered);
   if (unpowered) out.push({ text: `Unpowered: ${BUILDINGS[unpowered.def].label}`, crit: false, x: unpowered.x, y: unpowered.y, id: unpowered.id });
   if (!w.research[f]?.cur && blds.some(b => BUILDINGS[b.def].bench?.research)) out.push({ text: 'Choose a research project', crit: false, tab: 'research' });
+  // leader mode: work nobody has agreed to do simply doesn't happen
+  if (g.minds.enabled && leaderMode(w, f)) {
+    const agreed = new Set<string>();
+    for (const p of cols) for (const d of p.mind?.lead?.duties || []) agreed.add(d.work);
+    const orphan: string[] = [];
+    let bps = 0; for (const b of w.blueprints.values()) if (b.faction === f) bps++;
+    if (bps && !agreed.has('construct')) orphan.push(`building (${bps} blueprints)`);
+    if (!agreed.has('grow') && [...w.zones.values()].some(z => z.faction === f && z.kind === 'grow')) orphan.push('farming');
+    if (!agreed.has('cook') && hasCook) orphan.push('cooking');
+    if (!agreed.has('haul') && zones.length && w.day >= 1) orphan.push('hauling');
+    if (!agreed.has('research') && w.research[f]?.cur && blds.some(b => BUILDINGS[b.def].bench?.research)) orphan.push('research');
+    if (orphan.length) out.push({ text: `Nobody agreed to: ${orphan.join(', ')} · talk to them`, crit: false, tab: 'work' });
+    if (!agreed.size && w.tick > 2500) out.unshift({ text: '💬 Nobody works unless you ask. Tap a colonist → Talk', crit: true, tab: 'work' });
+  }
   return out;
 }

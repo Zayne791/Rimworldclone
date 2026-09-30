@@ -731,12 +731,23 @@ export class Renderer {
       if (p.race !== 'human' || p.dead) continue;
       const talking = p.speech && p.speech.t > w.tick;
       const thinking = !talking && this.opts.thinking?.(p.id);
-      if (!talking && !thinking) continue;
+      const asks = !talking && !thinking && p.faction === this.opts.faction && !!p.mind?.lead?.audience;
+      if (!talking && !thinking && !asks) continue;
       const pos = this.pawnDraw.get(p.id);
       const [wx, wy] = pos && w.mode === 'client' ? [pos.x, pos.y] : this.pawnPos(p);
       const [sx, sy] = this.worldToScreen(wx + 8, wy - 12);
       const X = sx * d, Y = sy * d;
       if (X < -maxW || Y < -80 * d || X > this.vw + maxW || Y > this.vh + 40 * d) continue;
+      if (asks) {
+        // wants a word with the leader: a bobbing speech-bubble marker
+        const b = Math.round(Math.sin(this.time * 4 + p.id) * 2 * d), r = 7 * d;
+        ctx.fillStyle = '#fbf3dc'; ctx.strokeStyle = '#3a2a20'; ctx.lineWidth = 2 * d;
+        ctx.beginPath(); ctx.arc(X, Y - 6 * d + b, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(X - 3 * d, Y - 6 * d + b + r - d); ctx.lineTo(X - 6 * d, Y + 4 * d + b); ctx.lineTo(X + 2 * d, Y - 6 * d + b + r - d); ctx.fill();
+        ctx.fillStyle = p.mind!.lead!.audience!.urgent ? '#e84838' : '#e88830';
+        for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.arc(X + k * 3.2 * d, Y - 6 * d + b, 1.3 * d, 0, Math.PI * 2); ctx.fill(); }
+        continue;
+      }
       if (thinking) {
         const t = this.time * 3 + p.id;
         ctx.fillStyle = 'rgba(244,240,232,0.9)';

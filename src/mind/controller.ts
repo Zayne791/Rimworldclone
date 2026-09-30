@@ -23,6 +23,19 @@ export class MindController {
   constructor(public g: Game) {}
 
   save() { saveSettings(this.settings); this.offlineFallback = false; this.stats.lastError = ''; }
+  /** count a model call's tokens and cost (decisions and conversations share the session budget) */
+  account(u: Usage, call = true) {
+    const s = this.stats;
+    s.usage.hit += u.hit; s.usage.miss += u.miss; s.usage.out += u.out;
+    s.cost += costOf(u);
+    if (call) s.calls++;
+  }
+  /** no key / no proxy: keep everything running on the offline mind and say why once */
+  goOffline(msg: string) {
+    if (this.offlineFallback) return;
+    this.offlineFallback = true;
+    this.g.ui?.toast(`AI minds: ${msg}. Using the offline mind until this is fixed (Menu → AI minds).`, 'bad');
+  }
   get enabled(): boolean { return !!this.g.world.playerByFaction(this.g.faction)?.minds; }
   get provider() { return this.offlineFallback ? 'offline' : this.settings.provider; }
   isThinking(id: number) { return this.inflight.has(id); }
@@ -76,8 +89,7 @@ export class MindController {
     const timer = setTimeout(() => ac.abort(), 25000);
     chat(this.settings, buildMessages(pc), ac.signal).then(r => {
       clearTimeout(timer);
-      this.stats.usage.hit += r.usage.hit; this.stats.usage.miss += r.usage.miss; this.stats.usage.out += r.usage.out;
-      this.stats.cost += costOf(r.usage);
+      this.account(r.usage, false); // the call is counted in finish()
       const d = parseDecision(r.text);
       if (!d) { this.stats.fails++; this.stats.lastError = 'Unreadable answer: ' + r.text.slice(0, 80); finish(mockDecide(pc!)); return; }
       this.stats.lastError = '';
@@ -92,9 +104,7 @@ export class MindController {
       if (err.fatal) {
         // no key / not deployed with one: keep the mode running with the offline mind and say why
         this.handled.delete(p.id);
-        if (this.offlineFallback) return;
-        this.offlineFallback = true;
-        g.ui?.toast(`AI minds: ${err.message}. Using the offline mind until this is fixed (Menu → AI minds).`, 'bad');
+        this.goOffline(err.message);
         return;
       }
       this.backoff.set(p.id, performance.now() + 15000);

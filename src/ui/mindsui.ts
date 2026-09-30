@@ -7,6 +7,8 @@ import { iconImg } from '../render/art/icons';
 import { pawnShortName } from '../sim/things';
 import { costOf, isPeak, PRICE, chat, LLMError } from '../mind/llm';
 import { TICKS_PER_HOUR, TICKS_PER_DAY } from '../core/constants';
+import { leaderMode, lead, dutyText } from '../sim/leader';
+import { speechSupported } from './voice';
 
 const closeBtn = `<button class="btn sm" data-a="closemodal">${iconImg('close', 'ico s')}</button>`;
 const money = (v: number) => (v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(3)}`);
@@ -15,6 +17,7 @@ const when = (t: number) => { const d = Math.floor(t / TICKS_PER_DAY) + 1, h = M
 export function mindsWindow(ui: UI) {
   const g = ui.g, mc = g.minds, s = mc.settings, st = mc.stats;
   const on = mc.enabled;
+  const lm = leaderMode(g.world, g.faction);
   const prov = (id: string, label: string, sub: string) => `<button class="btn sm ${s.provider === id ? 'on' : ''}" data-a="w:mprov" data-v="${id}">${label}<small class="dim"> ${sub}</small></button>`;
   const u = st.usage;
   const avg = st.calls ? st.cost / st.calls : 0;
@@ -24,6 +27,10 @@ export function mindsWindow(ui: UI) {
       <button class="btn ${on ? 'good' : ''}" data-a="w:mindson" data-v="${on ? '0' : '1'}">${on ? '✔ AI minds ON' : 'Turn AI minds on'}</button>
       <button class="btn sm" data-a="w:mtest">Test connection</button>
     </div>
+    <h3>Leader mode</h3>
+    <div class="small">${lm ? 'On: <b>no work orders</b>. Colonists only do work they have agreed to in conversation with you, and come to you with requests, complaints and disputes. Talk to them from the inspector (Talk), the Work tab (People) or when they ask.' : 'Off: colonists choose their own work from what the colony needs.'}</div>
+    <div class="row wrap" style="margin-top:6px"><button class="btn sm ${lm ? 'on' : ''}" data-a="w:mleader" data-v="${lm ? '0' : '1'}">${lm ? '✔ Leader mode' : 'Turn leader mode on'}</button></div>
+    <div class="tiny dim" style="margin-top:4px">Voice: ${speechSupported() ? 'your browser can hear you. Tap the mic in a conversation and speak; the colonist answers in their own voice.' : "this browser has no speech recognition, so you'll type (Safari on iPad/iPhone and Chrome support voice)."}</div>
     <h3>Where the AI runs</h3>
     <div class="seg col">${prov('server', 'This server\'s key', '(DEEPSEEK_API_KEY on Vercel or the relay)')}${prov('key', 'My own DeepSeek key', '(kept on this device)')}${prov('offline', 'Offline mind', '(no AI, simple rules; free)')}</div>
     ${s.provider === 'key' ? `<div class="field"><label>DeepSeek API key</label><input type="password" autocomplete="off" placeholder="sk-…" value="${escapeHtml(s.key)}" data-in="mkey"><div class="tiny dim">Get one at platform.deepseek.com. It is stored only in this browser and sent only to the game's /api/llm proxy or DeepSeek.</div></div>` : ''}
@@ -50,6 +57,7 @@ export function mindsAction(ui: UI, a: string, d: DOMStringMap): boolean {
   switch (a) {
     case 'mindson': g.cmd({ c: 'minds', on: d.v === '1' }); if (d.v === '1') ui.toast('Your colonists now think for themselves', 'good'); again(); return true;
     case 'mprov': mc.settings.provider = d.v as any; mc.save(); again(); return true;
+    case 'mleader': g.cmd({ c: 'leadermode', on: d.v === '1' }); ui.toast(d.v === '1' ? 'Leader mode: nothing gets done unless you ask' : 'Colonists pick their own work again', 'good'); again(); return true;
     case 'mtest': {
       if (mc.settings.provider === 'offline') { ui.toast('Offline mind needs no connection', 'good'); return true; }
       ui.toast('Asking DeepSeek…');
@@ -76,7 +84,15 @@ export function mindTab(ui: UI, p: Pawn): string {
   const g = ui.g, w = g.world, m = p.mind;
   if (!m) return `<div class="dim small">This colonist follows the work tab. Turn on <b>AI minds</b> in the Menu to let DeepSeek play them.</div>`;
   const thinking = g.minds.isThinking(p.id);
-  let h = `<div class="mind-now">${thinking ? '<span class="accent">💭 thinking…</span>' : m.want ? '<span class="dim">waiting to decide…</span>' : ''}</div>`;
+  let lh = '';
+  if (leaderMode(w, p.faction) && m.on) {
+    const L = lead(p);
+    lh = `<div class="row"><span class="grow small">Trust in you <b class="${L.trust >= 0 ? 'good' : 'bad'}">${L.trust > 0 ? '+' : ''}${Math.round(L.trust)}</b> · ${L.talks} exchanges</span><button class="btn sm good" data-a="talkopen" data-id="${p.id}">💬 Talk</button></div>`;
+    lh += `<h3>Agreed work</h3>` + (L.duties.length ? L.duties.map(d => `<div class="small">• ${escapeHtml(dutyText(d))} <span class="dim tiny">done ${d.done}×</span></div>`).join('') : '<div class="small warn">Nothing agreed. They won\'t work unless you talk to them.</div>');
+    if (L.promises.length) lh += `<h3>You promised</h3>` + L.promises.map(x => `<div class="small">• ${escapeHtml(x.text)} <span class="dim tiny">${when(x.t)}</span></div>`).join('');
+    if (L.audience) lh += `<div class="small accent" style="margin-top:4px">💬 Wants to talk: “${escapeHtml(L.audience.text)}”</div>`;
+  }
+  let h = lh + `<div class="mind-now">${thinking ? '<span class="accent">💭 thinking…</span>' : m.want ? '<span class="dim">waiting to decide…</span>' : ''}</div>`;
   if (m.thought) h += `<div class="mind-thought">“${escapeHtml(m.thought)}”</div>`;
   if (m.goal) {
     const left = Math.max(0, m.goal.until - w.tick);

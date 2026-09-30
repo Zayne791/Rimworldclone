@@ -37,8 +37,8 @@ export function costOf(u: Usage, peak = isPeak()): number {
 
 export class LLMError extends Error { constructor(msg: string, public status = 0, public fatal = false) { super(msg); } }
 
-export async function chat(s: LLMSettings, messages: Msg[], signal?: AbortSignal): Promise<{ text: string; usage: Usage }> {
-  const body = { model: s.model, messages, max_tokens: 260, temperature: 1.0 };
+export async function chat(s: LLMSettings, messages: Msg[], signal?: AbortSignal, maxTokens = 260): Promise<{ text: string; usage: Usage }> {
+  const body = { model: s.model, messages, max_tokens: maxTokens, temperature: 1.0 };
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (s.provider === 'key' && s.key) headers['X-DeepSeek-Key'] = s.key;
   if (s.password) headers['X-LLM-Password'] = s.password;

@@ -18,8 +18,10 @@ import { isIncapable } from './stats';
 import { pawnShortName } from './things';
 import { roomAt } from './rooms';
 import { dist } from '../core/util';
+import { inLeaderMode, allowedWork, requestAudience } from './leader';
 
-export const ACTIONS = ['work', 'eat', 'sleep', 'relax', 'talk', 'tend', 'fight', 'flee', 'go', 'idle'] as const;
+export const ACTIONS = ['work', 'eat', 'sleep', 'relax', 'talk', 'tend', 'fight', 'flee', 'go', 'idle', 'leader'] as const;
+export const TOPICS = ['request', 'complaint', 'dispute', 'report', 'offer', 'feelings', 'quit', 'warning', 'chat'] as const;
 export const TONES = ['friendly', 'joke', 'deep', 'comfort', 'praise', 'flirt', 'apologize', 'argue', 'insult'] as const;
 export type Action = typeof ACTIONS[number];
 export type Tone = typeof TONES[number];
@@ -36,9 +38,10 @@ export interface Mind {
   last: number;                 // tick of last decision
   n: number;                    // decisions so far
   fails: number;
+  lead?: import('./leader').Lead;  // leader mode: duties, trust, promises, requests to talk
 }
 /** a sanitized model decision */
-export interface Decision { thought?: string; action: Action; work?: string; target?: string; tone?: string; say?: string; hours?: number; remember?: string; place?: string }
+export interface Decision { thought?: string; action: Action; work?: string; target?: string; tone?: string; say?: string; hours?: number; remember?: string; place?: string; topic?: string }
 export interface TalkLine { t: number; from: number; to?: number; text: string; tone?: string; kind: 'say' | 'thought'; n?: number }
 
 export function newMind(on = true): Mind { return { on, goal: null, want: 1, why: 'just woke up in the colony', inbox: [], memory: [], last: 0, n: 0, fails: 0 }; }
@@ -64,7 +67,7 @@ function request(w: World, p: Pawn, why: string) {
 /** is a decision due now? (want holds the tick it becomes due) */
 export function mindDue(w: World, p: Pawn) { const m = p.mind; return !!m?.on && !!m.want && m.want <= w.tick && !p.dead; }
 
-const DEFAULT_HOURS: Record<Action, number> = { work: 2, eat: 0.5, sleep: 7, relax: 1, talk: 0.3, tend: 0.5, fight: 0.5, flee: 0.4, go: 0.5, idle: 0.4 };
+const DEFAULT_HOURS: Record<Action, number> = { work: 2, eat: 0.5, sleep: 7, relax: 1, talk: 0.3, tend: 0.5, fight: 0.5, flee: 0.4, go: 0.5, idle: 0.4, leader: 0.3 };
 const clampNum = (v: unknown, lo: number, hi: number, d: number) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };
 const clean = (s: unknown, n: number) => (typeof s === 'string' ? s.replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n) : '');
 
@@ -97,6 +100,18 @@ export function applyDecision(w: World, p: Pawn, raw: Decision, seen: number) {
   if (action === 'work') {
     const wt = WORK_TYPES.find(t => t.id === raw.work || t.label.toLowerCase() === String(raw.work || '').toLowerCase());
     if (wt) { goal.work = wt.id; goal.label = wt.label.toLowerCase(); } else { goal.type = 'idle'; goal.label = 'idle'; }
+    // leader mode: nobody works on something they haven't agreed to (emergencies aside)
+    if (wt && inLeaderMode(w, p) && !allowedWork(w, p).includes(wt.id)) {
+      goal.type = 'idle'; goal.label = 'idle';
+      mindEvent(w, p, `You thought about doing ${wt.label.toLowerCase()}, but you never agreed to that with the leader. Take it up with them if it needs doing.`);
+    }
+  }
+  if (action === 'leader') {
+    const topic = (TOPICS as readonly string[]).includes(String(raw.topic)) ? String(raw.topic) : 'chat';
+    const about = findByName(w, p, raw.target);
+    if (say && requestAudience(w, p, topic, say, about)) { goal.label = 'waiting to talk to the leader'; }
+    goal.type = 'idle';
+    goal.until = Math.min(goal.until, w.tick + 600);
   }
   if (action === 'talk' || action === 'tend' || action === 'fight') {
     const t = findByName(w, p, raw.target);
@@ -112,7 +127,7 @@ export function applyDecision(w: World, p: Pawn, raw: Decision, seen: number) {
   m.want = 0; m.why = undefined; m.last = w.tick; m.n++; m.fails = 0;
   if (thought) logTalk(w, { t: w.tick, from: p.id, text: thought, kind: 'thought' });
   // spoken aloud (a talk goal says its line when the two actually meet)
-  if (say && action !== 'talk') speak(w, p, say);
+  if (say && action !== 'talk' && action !== 'leader') speak(w, p, say);
   // switch now unless in the middle of something that shouldn't be dropped
   const j = p.job;
   if (j && !p.drafted && !j.forced && !['rescue', 'tend', 'flee', 'eat', 'talk'].includes(j.type) && !(j.type === 'sleep' && p.needs.rest < 0.25)) {
@@ -165,9 +180,14 @@ function goalJob(w: World, p: Pawn, g: MindGoal): Job | null {
   switch (g.type) {
     case 'work': {
       if (!g.work || isIncapable(p, g.work)) return null;
+      if (inLeaderMode(w, p) && !allowedWork(w, p).includes(g.work)) return null;
       const giver = GIVERS[g.work];
       const j = giver ? giver(w, p) : null;
-      if (j) j.label = WORK_TYPES.find(t => t.id === g.work)?.label;
+      if (j) {
+        j.label = WORK_TYPES.find(t => t.id === g.work)?.label;
+        const duty = p.mind?.lead?.duties.find(d => d.work === g.work);
+        if (duty) j.data = { ...(j.data || {}), duty: duty.id };
+      }
       return j;
     }
     case 'eat': return p.needs.food > 0.97 ? done(w, p, g) : eatJob(w, p);

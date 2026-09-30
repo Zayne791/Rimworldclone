@@ -156,6 +156,14 @@ th({ id: 'praised', label: 'Was praised', mood: 4, days: 1, stack: 3, social: 8 
 th({ id: 'shared_joke', label: 'Shared a joke', mood: 3, days: 0.5, stack: 4, social: 6 });
 th({ id: 'got_apology', label: 'Got an apology', mood: 2, days: 1, social: 10 });
 th({ id: 'argued', label: 'Had an argument', mood: -4, days: 1, stack: 3, social: -10 });
+th({ id: 'leader_praised', label: 'Praised by the leader', mood: 5, days: 1, stack: 2 });
+th({ id: 'leader_inspired', label: 'Inspired by the leader', mood: 8, days: 1 });
+th({ id: 'leader_comforted', label: 'The leader listened to me', mood: 5, days: 1 });
+th({ id: 'leader_thanked', label: 'Thanked by the leader', mood: 3, days: 1, stack: 2 });
+th({ id: 'leader_insulted', label: 'Insulted by the leader', mood: -7, days: 2, stack: 3 });
+th({ id: 'leader_threatened', label: 'Threatened by the leader', mood: -9, days: 2, stack: 2 });
+th({ id: 'leader_dismissed', label: 'The leader brushed me off', mood: -4, days: 1, stack: 3 });
+th({ id: 'leader_guilted', label: 'Guilt-tripped by the leader', mood: -3, days: 1, stack: 2 });
 th({ id: 'new_colonist', label: 'Welcomed a new colonist', mood: 3, days: 1, stack: 3 });
 th({ id: 'rescued', label: 'Was rescued', mood: 5, days: 3, social: 10 });
 th({ id: 'tended', label: 'Wounds tended', mood: 2, days: 1 });

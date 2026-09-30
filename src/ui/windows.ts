@@ -17,6 +17,8 @@ import { jobLabel } from '../sim/jobs';
 import { saveToDb, listSaves, exportSave } from '../sim/save';
 import { TICKS_PER_DAY, GAME_NAME, VERSION } from '../core/constants';
 import { PRIORITY_LABELS } from '../sim/zones';
+import { peopleHtml } from './talkui';
+import { leaderMode } from '../sim/leader';
 import { techTreeWindow, techTreeAction } from './techtree';
 import { mindsWindow, mindsAction, mindsInput, voicesHtml } from './mindsui';
 
@@ -59,10 +61,12 @@ function renderWindow(ui: UI, kind: string) {
 // ---------------- work & schedule ----------------
 function workWindow(ui: UI) {
   const g = ui.g;
-  if (!st.tab) st.tab = 'work';
+  const lm = g.minds.enabled && leaderMode(g.world, g.faction);
+  if (!st.tab || (lm && st.tab === 'work') || (!lm && st.tab === 'people')) st.tab = lm ? 'people' : 'work';
   const cols = g.world.colonists(g.faction);
   let body = '';
-  if (st.tab === 'work') {
+  if (st.tab === 'people') body += peopleHtml(ui);
+  else if (st.tab === 'work') {
     body += `<div class="small dim" style="margin-bottom:6px">Tap a cell to cycle priority: 1 (highest) → 4 → off. Colonists do higher-priority work first. Gold border = their best at it.</div><div class="scroll-x"><table class="wgrid"><tr><th></th>${VISIBLE_WORK.map(w => `<th>${w.label}</th>`).join('')}</tr>`;
     for (const p of cols) {
       body += `<tr><td class="nm"><img class="ico s" src="${portraitURL(p)}"> ${escapeHtml(pawnShortName(p))}</td>`;
@@ -83,7 +87,7 @@ function workWindow(ui: UI) {
     for (const p of cols) body += `<tr><td class="nm small">${escapeHtml(pawnShortName(p))} <button class="btn sm flat tiny" data-a="w:schedall" data-p="${p.id}">all</button></td>${p.schedule.split('').map((c, h) => `<td><div class="sc ${c}" data-a="w:sched" data-p="${p.id}" data-h="${h}"></div></td>`).join('')}</tr>`;
     body += `</table></div><div class="small dim" style="margin-top:6px">Tap hours to paint. "all" copies this colonist's schedule to everyone.</div>`;
   }
-  ui.showModal('work', `<div class="wh"><h2>${st.tab === 'work' ? 'Work' : 'Schedule'}</h2>${tabsHtml(ui, [['work', 'Work'], ['sched', 'Schedule']], st.tab)}${closeBtn}</div><div class="wb">${body}</div>`, 'wide');
+  ui.showModal('work', `<div class="wh"><h2>${st.tab === 'people' ? 'Your people' : st.tab === 'work' ? 'Work' : 'Schedule'}</h2>${tabsHtml(ui, lm ? [['people', 'People'], ['sched', 'Schedule']] : [['work', 'Work'], ['sched', 'Schedule']], st.tab)}${closeBtn}</div><div class="wb">${body}</div>`, st.tab === 'people' ? '' : 'wide');
 }
 
 // ---------------- research ----------------
@@ -210,7 +214,7 @@ function helpWindow(ui: UI) {
     ['Select many', 'Double-tap a colonist, or Orders → Select box'], ['Context actions', 'Long-press the map (right-click on desktop) with a colonist selected: equip, rescue, capture, haul…'],
     ['Combat', 'Select colonists → Draft (or tap ⚔ Draft all on the colonist bar during a raid). Then tap the ground to move, tap enemies to attack.'], ['Build', 'Build tab → pick a structure → tap or drag on the map. Walls: drag diagonally to outline a whole room!'],
     ['Zones', 'Zones tab → Stockpile / Growing zone → drag an area.'], ['Work', 'Work tab: set who does what (1 = highest priority).'], ['Research', 'Build a research bench, then pick a project in Research.'],
-    ['Speed', 'Top-right buttons. Space bar pauses on desktop. In multiplayer the game runs at the slowest speed anyone picked, so anyone can pause.'], ['Hints', 'The notes on the left flag problems; tap one with › to open the right menu.'], ['AI minds', 'Menu → AI minds lets DeepSeek play every colonist: they pick their own work, rest and fun, talk, flirt and argue. Watch the Voices tab in Colony.'], ['Goal', 'Survive, grow, research Starflight and build a ship to escape.'],
+    ['Speed', 'Top-right buttons. Space bar pauses on desktop. In multiplayer the game runs at the slowest speed anyone picked, so anyone can pause.'], ['Hints', 'The notes on the left flag problems; tap one with › to open the right menu.'], ['AI minds', 'Menu → AI minds lets DeepSeek play every colonist: they pick their own work, rest and fun, talk, flirt and argue. Watch the Voices tab in Colony.'], ['Leader mode', 'With AI minds on, nobody takes orders: tap a colonist → Talk and persuade them, out loud (tap the mic) or by typing. They come to you too. Keep your promises.'], ['Goal', 'Survive, grow, research Starflight and build a ship to escape.'],
   ];
   const tips = ['Start with: a stockpile zone, a campfire and a butcher spot (both come with a starter bill), beds in a walled room, then a growing zone of rice or potatoes.', 'Hunters carry kills to the butcher spot; the cook turns the meat into meals.', 'Walls + a door enclose a room; roofs are added automatically.', 'Colonists get sad from raw food, sleeping on the ground and ugly rooms.', 'Hunt animals for meat, but beware — some fight back!', 'In winter, crops die outdoors. Build a freezer (room + cooler) to store food.', 'Raiders flee after losing half their group. Fight from behind sandbags and walls.'];
   ui.showModal('help', `<div class="wh"><h2>How to play</h2>${closeBtn}</div><div class="wb"><div class="help-grid">${rows.map(([k, v]) => `<b class="accent">${k}</b><span>${v}</span>`).join('')}</div><h3>Tips</h3>${tips.map(t => `<div class="small" style="margin:3px 0">• ${t}</div>`).join('')}</div>`);

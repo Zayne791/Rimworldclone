@@ -15,6 +15,8 @@ import { countResource } from '../sim/zones';
 import { computeAlerts, type Alert } from './alerts';
 import { TICKS_PER_DAY } from '../core/constants';
 import { pawnShortName } from '../sim/things';
+import { openTalk, addressColony, type TalkUI } from './talkui';
+import { Babble, voiceOf } from '../audio/babble';
 
 export type Handler = (el: HTMLElement, ui: UI) => void;
 
@@ -57,6 +59,9 @@ export class UI {
   letterQueue: number[] = [];
   handlers: Record<string, Handler> = {};
   alertList: Alert[] = [];
+  talk: TalkUI | null = null;
+  audienceEl: HTMLElement | null = null;
+  private heardAsk = new Map<number, number>();
 
   constructor(g: Game) {
     this.g = g;
@@ -115,7 +120,7 @@ export class UI {
   // ---------------- per-frame ----------------
   frame(dt: number) {
     this.t += dt; this.tSheet += dt; this.tAlerts += dt; this.tModal += dt;
-    if (this.t > 0.25) { this.t = 0; this.renderTop(); this.renderColbar(); this.renderBanner(); }
+    if (this.t > 0.25) { this.t = 0; this.renderTop(); this.renderColbar(); this.renderBanner(); this.renderAudience(); }
     if (this.tSheet > 0.2) { this.tSheet = 0; this.renderSheet(); }
     if (this.tAlerts > 1.2) { this.tAlerts = 0; this.renderAlerts(); this.checkLetters(); }
     if (this.tModal > 0.5 && this.modal) { this.tModal = 0; W.refreshWindow(this); }
@@ -183,16 +188,40 @@ export class UI {
       if (!el) return;
       const mood = p.needs.mood;
       const col = mood < 0.2 ? '#ff5a4a' : mood < 0.35 ? '#ffb44a' : mood < 0.6 ? '#d8d070' : '#7fd67a';
-      const st = p.drafted ? '⚔' : p.downed ? '✚' : p.mental ? '!' : p.inspired ? '★' : '';
+      const asks = !!p.mind?.lead?.audience && !!g.minds.enabled;
+      const st = p.drafted ? '⚔' : p.downed ? '✚' : p.mental ? '!' : asks ? '💬' : p.inspired ? '★' : '';
       const sig = `${p.drafted ? 1 : 0}${p.downed ? 1 : 0}${p.mental ? 1 : 0}${Math.round(mood * 50)}${g.selection.has(p.id) ? 1 : 0}${p.apparel.map(a => a.def).join()}${p.name.nick}${st}`;
       if (el.dataset.sig === sig) return;
       el.dataset.sig = sig;
-      el.className = `cb ${g.selection.has(p.id) ? 'sel' : ''} ${p.drafted ? 'drafted' : ''} ${p.downed ? 'downed' : ''} ${p.mental ? 'break' : ''}`;
+      el.className = `cb ${g.selection.has(p.id) ? 'sel' : ''} ${p.drafted ? 'drafted' : ''} ${p.downed ? 'downed' : ''} ${p.mental ? 'break' : ''} ${asks ? 'asks' : ''}`;
       const img = el.querySelector('img')!; const u = portraitURL(p); if (img.getAttribute('src') !== u) img.src = u;
       (el.querySelector('.nm') as HTMLElement).textContent = pawnShortName(p);
       const bar = el.querySelector('.mb i') as HTMLElement; bar.style.width = Math.round(mood * 100) + '%'; bar.style.background = col;
       (el.querySelector('.st') as HTMLElement).textContent = st;
     });
+  }
+  /** a colonist asking for the leader: a banner with their words and a Talk button */
+  renderAudience() {
+    const g = this.g, w = g.world;
+    const asks = g.minds.enabled && !this.talk ? w.colonists(g.faction).filter(p => p.mind?.lead?.audience && !p.dead)
+      .sort((a, b) => (b.mind!.lead!.audience!.urgent ? 1 : 0) - (a.mind!.lead!.audience!.urgent ? 1 : 0) || a.mind!.lead!.audience!.t - b.mind!.lead!.audience!.t) : [];
+    const sig = asks.map(p => `${p.id}:${p.mind!.lead!.audience!.t}`).join(',');
+    if (this.sig.aud === sig) return;
+    this.sig.aud = sig;
+    for (const p of asks) {
+      const t = p.mind!.lead!.audience!.t;
+      if (this.heardAsk.get(p.id) === t) continue;
+      this.heardAsk.set(p.id, t);
+      new Babble(g.audio).hail(voiceOf(p));
+    }
+    if (!asks.length) { this.audienceEl?.remove(); this.audienceEl = null; return; }
+    if (!this.audienceEl) { this.audienceEl = h('div', { id: 'audience', class: 'px' }); this.root.appendChild(this.audienceEl); }
+    const p = asks[0], a = p.mind!.lead!.audience!;
+    const about = a.about ? w.pawns.get(a.about) : null;
+    const topic: Record<string, string> = { request: 'has a request', complaint: 'has a complaint', dispute: 'has a problem with ' + (about ? pawnShortName(about) : 'someone'), report: 'has something to report', offer: 'has an offer', feelings: 'needs to talk', quit: 'is thinking of leaving', warning: 'has a warning', chat: 'wants a word', emergency: 'needs you now' };
+    this.audienceEl.className = `px ${a.urgent ? 'urgent' : ''}`;
+    this.audienceEl.innerHTML = `<img class="ico l" src="${portraitURL(p)}" data-a="colsel" data-id="${p.id}"><div class="grow"><b>${escapeHtml(pawnShortName(p))}</b> <span class="small dim">${escapeHtml(topic[a.topic] || 'wants to talk')}</span><div class="small aud-q">“${escapeHtml(a.text)}”</div></div>
+      <div class="aud-b"><button class="btn good" data-a="talkopen" data-id="${p.id}">💬 Talk</button>${about && about.mind && !about.dead ? `<button class="btn sm" data-a="talkopen" data-ids="${p.id},${about.id}">Hear both</button>` : ''}<button class="btn sm flat" data-a="audlater" data-id="${p.id}">Later</button></div>${asks.length > 1 ? `<span class="aud-n">+${asks.length - 1}</span>` : ''}`;
   }
   cycleColonist(dir: number) {
     const cols = this.g.world.colonists(this.g.faction);
@@ -336,6 +365,7 @@ export class UI {
   }
   closeModal() { if (this.modal) { this.modal.remove(); this.modal = null; this.modalKind = ''; this.modalArg = null; this.sig.modal = ''; } this.markTabs(); }
   closeTop(): boolean {
+    if (this.talk) { this.talk.close(); return true; }
     if (this.ctx || this.resbox) { this.closeFloating(); return true; }
     if (this.modal) { this.closeModal(); return true; }
     if (this.drawer) { this.closeDrawer(); return true; }
@@ -417,6 +447,9 @@ const HANDLERS: Record<string, Handler> = {
     ui.g.audio.play(on ? 'draft' : 'click');
   },
   letter: (el, ui) => { W.openLetter(ui, +el.dataset.id!); },
+  talkopen: (el, ui) => { const ids = el.dataset.ids ? el.dataset.ids.split(',').map(Number) : [+el.dataset.id!]; openTalk(ui, ids); },
+  talkall: (el, ui) => { addressColony(ui); },
+  audlater: (el, ui) => { ui.g.cmd({ c: 'audience', pawn: +el.dataset.id!, op: 'later' }); ui.sig.aud = ''; ui.toast('They will wait a while, but not forever'); },
   alert: (el, ui) => {
     const a = ui.alertList[+el.dataset.k!];
     if (!a) return;

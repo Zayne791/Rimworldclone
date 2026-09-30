@@ -110,7 +110,7 @@ def('talk', {
   },
 });
 def('wait', {
-  label: (w, p) => (p.drafted ? 'standing by' : 'idle'),
+  label: (w, p, j) => j.label || (p.drafted ? 'standing by' : 'idle'),
   tick(w, p, j) { j.w++; return j.w >= (j.count || 60) ? 'done' : 'ongoing'; },
 });
 def('wander', {

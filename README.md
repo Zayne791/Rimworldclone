@@ -75,6 +75,38 @@ decisions per game day, so it costs under a cent per colonist per game day, and 
 The AI minds window shows tokens and spend live, caps decisions per minute and stops at a
 per-session budget (default $1). In multiplayer, each player's device runs its own colony's minds.
 
+## Leader mode: talk to your people
+
+With AI minds on, **leader mode** is on by default (Menu → AI minds to switch it off). There are no
+work orders. You can still place blueprints, zones, bills and research, but nothing gets done until
+a colonist **agrees to it in conversation with you**:
+
+- **Talk face to face.** Tap a colonist → **Talk** (or the Work tab's People view, or the banner
+  when someone asks for you). A close-up of their face opens: pixel-art portrait that blinks,
+  lip-syncs and changes expression, and a dialog box that types their words out in their own
+  babbling voice, Animal Crossing style. **Tap the mic and speak** (Safari on iPad/iPhone, Chrome,
+  Edge); it sends when you stop talking. Or tap ⌨ to type. Suggestion chips help you start.
+- **Persuade, don't order.** Ask for a one-off job ("could you build the barracks walls?") or a
+  regular duty ("would you make cooking your job, mornings?"). Personality, skills, passions,
+  mood, needs, workload and **trust in you** decide the answer. Explaining why, praise, fairness
+  and kept promises work; demands, threats and insults backfire and cost trust. They haggle: "I'll
+  do it if I get a proper bed". Say yes and it's recorded as your promise.
+- **They come to you.** Colonists ask for a word with requests, complaints, offers to take on work
+  nobody is doing, warnings, feelings, and **disputes** with each other. A banner shows who wants
+  to talk (💬 on their portrait and over their head). **Hear both** brings the two sides together
+  to mediate; **＋ Bring in** adds anyone to a talk. Ignore someone for half a day and it stings.
+- **Speak to everyone.** 📣 *Address everyone* (Work tab) gathers the colony; each person answers
+  for themselves.
+- **Trust** (−100…100) rises when you listen, praise honest work and keep your word, and falls
+  with neglect, overwork, broken promises and harsh words. People who've lost faith refuse to be
+  drafted, and eventually walk away.
+- Duties live in the Talk screen's *Duties* panel and the inspector's Mind tab: you can always
+  release someone or change the order; asking for more takes another conversation. Firefighting
+  and tending the wounded happen without asking.
+
+Offline (no key) the same screen runs on a rule-based talker that reads your requests, tone and
+reasons, so you can try it for free. A talk turn with DeepSeek costs about as much as a decision.
+
 ## Multiplayer
 
 Multiplayer is **separate colonies on a shared map**. One player hosts, and friends join with a
@@ -162,6 +194,7 @@ It is generated from the game data (`npx tsx dev/gen-features.ts`), so rerun tha
   fusion reactors, autocannon turrets, shield belts, weather controllers…), dozens of items and
   recipes, and stacking colony bonuses. The tree is a pannable, zoomable map with a research queue.
 - **AI minds**: DeepSeek plays each colonist (see above), with speech bubbles and a Voices log.
+- **Leader mode**: no work orders; persuade each colonist face to face, by voice or text (see above).
 - **Trading** (caravans and orbital traders), **save/load** (auto-save in the browser,
   export/import to file).
 
@@ -178,6 +211,7 @@ Headless simulation tests run in Node with `npx tsx`:
 | `tests/pathstat.ts`, `tests/pathfail.ts` | pathfinding load and failure sources |
 | `tests/tech.ts` | research data integrity, then builds every unlockable building and checks each mechanic works |
 | `tests/minds.ts [days]` | AI minds soak with the offline mind; checks the colony functions and estimates DeepSeek cost |
+| `tests/leader.ts` | leader mode: no work without agreement, conversations create duties that get done, audiences, trust, mediation, speeches, draft refusal, save/load |
 | `node tests/llmproxy.mjs` | `/api/llm` proxy against a fake DeepSeek: request shape, keys, password, limits |
 
 Browser checks use Playwright against `npm run dev` (they expect the dev server on port 5173; the
@@ -187,7 +221,10 @@ two-device multiplayer session including reconnect, `dev/mp-soak.mjs` diffs host
 worlds after a long run, `dev/perf.mjs` measures frame rate, and `dev/raid.mjs` exercises the
 raid/draft flow. `dev/techtree.mjs`, `dev/people.mjs` and `dev/sprites.mjs` screenshot the research
 tree, colonist art and building sprites; `dev/minds.mjs` and `dev/mp-minds.mjs` run AI minds in the
-browser (single player and multiplayer). `dev/fake-deepseek.mjs` stands in for the DeepSeek API
+browser (single player and multiplayer, including a leader-mode talk over the network).
+`dev/talk.mjs` walks the talk screen (one-on-one, deal, duties, mediation, speech, audience banner),
+`dev/voice.mjs` drives voice input with a stand-in speech recognizer, and `dev/faces.mjs` renders
+every talking-face expression and mouth shape. `dev/fake-deepseek.mjs` stands in for the DeepSeek API
 (`DEEPSEEK_BASE_URL=http://127.0.0.1:9911`) so the whole chain can be tested without a key.
 
 ## Code map
@@ -198,12 +235,16 @@ src/
   data/      game definitions (terrain, items, plants, buildings, recipes, research, animals, health)
   sim/       simulation: world, map, mapgen, pathfinding, AI, jobs, work, needs,
              health, combat, rooms, power, environment, storyteller, trading, commands, save,
-             techfx (research bonuses), auras (research-tree buildings), minds (AI minds)
+             techfx (research bonuses), auras (research-tree buildings), minds (AI minds),
+             leader (duties, trust, audiences, promises)
   render/    Canvas2D renderer, chunk cache, lighting, particles; art/ = procedural pixel-art sprites
-  ui/        DOM UI (HUD, inspector, drawers, tools, windows, menus) + styles
-  mind/      AI minds client side: perception, prompt, DeepSeek client, offline mind, scheduler
+             (art/face.ts = the animated close-up faces of the talk screen)
+  ui/        DOM UI (HUD, inspector, drawers, tools, windows, menus) + styles;
+             talkui.ts = the face-to-face talk screen, voice.ts = speech recognition
+  mind/      AI minds client side: perception, prompt, DeepSeek client, offline mind, scheduler;
+             talk.ts = conversations with the leader, talkmock.ts = the offline talker
   net/       multiplayer transports (WebRTC via PeerJS, WebSocket relay) and host/client sessions
-  audio/     synthesized sound effects and generative music (WebAudio, no audio files)
+  audio/     synthesized sound effects, generative music and babble voices (WebAudio, no audio files)
 api/llm.js         Vercel Edge Function: the /api/llm DeepSeek proxy
 server/llmproxy.mjs  the proxy logic, shared by Vercel, the dev server and the relay
 server/relay.mjs   optional WebSocket relay + static file server (+ /api/llm)

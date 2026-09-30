@@ -15,7 +15,7 @@ fully simulated yet, this guide says so.
 | Plants, crops & trees | 20 |
 | Colonist traits | 36 |
 | Backstories | 30 |
-| Mood thoughts | 90 |
+| Mood thoughts | 98 |
 | Weather types | 7 |
 
 ## Contents
@@ -37,15 +37,16 @@ fully simulated yet, this guide says so.
 15. [Items](#items)
 16. [Research tree](#research-tree)
 17. [AI minds (DeepSeek)](#ai-minds-deepseek)
-18. [Combat & defense](#combat--defense)
-19. [Animals](#animals)
-20. [Events & storytellers](#events--storytellers)
-21. [Trading, visitors & factions](#trading-visitors--factions)
-22. [Endgame: build a ship](#endgame-build-a-ship)
-23. [Multiplayer](#multiplayer)
-24. [Saving](#saving)
-25. [Art, sound & presentation](#art-sound--presentation)
-26. [Known gaps](#known-gaps)
+18. [Leader mode](#leader-mode)
+19. [Combat & defense](#combat--defense)
+20. [Animals](#animals)
+21. [Events & storytellers](#events--storytellers)
+22. [Trading, visitors & factions](#trading-visitors--factions)
+23. [Endgame: build a ship](#endgame-build-a-ship)
+24. [Multiplayer](#multiplayer)
+25. [Saving](#saving)
+26. [Art, sound & presentation](#art-sound--presentation)
+27. [Known gaps](#known-gaps)
 
 ## First hour: what to try
 
@@ -69,6 +70,8 @@ A tour that touches most systems. Each step names what you should see happen.
 11. **Multiplayer.** Menu → room code / *Copy invite link* when hosting; a friend on another device lands their own colony on your map.
 12. **AI minds.** Menu → AI minds → turn it on. Every colonist is now played by DeepSeek: watch the thought bubbles, speech
     bubbles and the Colony → Voices log. (No key? Pick *Offline mind* to try it for free.)
+13. **Leader mode** (on with AI minds). Nothing gets done unless you ask: tap a colonist → **Talk**, tap the mic and ask them
+    to build, farm or cook. Watch them answer in their own voice. Try asking rudely, then nicely. Wait for someone to ask for you.
 
 ## Screen & controls
 
@@ -77,7 +80,7 @@ The game is built for touch, portrait first.
 | Area | What it shows |
 | --- | --- |
 | Top bar | Time, date, weather and temperature; pause and 3 speed buttons; multiplayer status (who is holding the speed down, "waiting for host") |
-| Colonist bar | Portrait, name and mood bar per colonist; ⚔ drafted, ✚ downed, ! mental break, ★ inspired. A red ⚔ Draft all button appears during threats |
+| Colonist bar | Portrait, name and mood bar per colonist; ⚔ drafted, ✚ downed, ! mental break, 💬 wants to talk to you, ★ inspired. A red ⚔ Draft all button appears during threats |
 | Hints (left) | Problems and next steps: raiders, starving, bleeding, break risk, idle colonists, low food/wood/medicine, missing beds or kitchen… Tap to jump or open the fixing menu |
 | Letters (right) | Event messages (red = threat, orange = bad, green = good, blue = info). Tap to read; Jump to shows the spot |
 | Inspector sheet (bottom) | Whatever is selected: colonist tabs (Overview, Health, Gear, Skills, Mood, Social), building controls, zone settings. Collapse with ▼ |
@@ -339,6 +342,14 @@ nothing triggers them yet.
 | Shared a joke | +3 | 0.5 days (stacks ×4) | +6 |
 | Got an apology | +2 | 1 day | +10 |
 | Had an argument | -4 | 1 day (stacks ×3) | -10 |
+| Praised by the leader | +5 | 1 day (stacks ×2) | — |
+| Inspired by the leader | +8 | 1 day | — |
+| The leader listened to me | +5 | 1 day | — |
+| Thanked by the leader | +3 | 1 day (stacks ×2) | — |
+| Insulted by the leader | -7 | 2 days (stacks ×3) | — |
+| Threatened by the leader | -9 | 2 days (stacks ×2) | — |
+| The leader brushed me off | -4 | 1 day (stacks ×3) | — |
+| Guilt-tripped by the leader | -3 | 1 day (stacks ×2) | — |
 | Welcomed a new colonist | +3 | 1 day (stacks ×3) | — |
 | Was rescued | +5 | 3 days | +10 |
 | Wounds tended | +2 | 1 day | — |
@@ -1183,7 +1194,8 @@ every few days, a weather controller that holds the sky clear, and the archotech
 ## AI minds (DeepSeek)
 
 Turn on **Menu → AI minds** and every colonist is played by a language model, DeepSeek (`deepseek-flash`, thinking
-mode off, JSON output). The Work tab stops being orders and becomes advice the colonists may follow.
+mode off, JSON output). With leader mode off, the Work tab stops being orders and becomes advice the colonists may follow;
+with leader mode on (the default) they only do work agreed with you in conversation (see Leader mode).
 
 **What the model sees.** A compact briefing written from the colonist's point of view: who they are (backstory, traits
 with their meaning, skills and passions, work they refuse), the time, weather and where they are, needs and the feelings
@@ -1201,6 +1213,7 @@ say out loud and an optional note to remember. The game turns that into ordinary
 | talk | walks over to someone and says the chosen line with a tone: friendly, joke, deep, comfort, praise, flirt, apologize, argue, insult. Tones have real effects: jokes can land or fall flat, comfort helps a sad friend, flirting can start a romance or get rebuffed, apologies erase grudges, insults can end in a fistfight |
 | tend / fight / flee | doctors someone, attacks a hostile, or runs |
 | go / idle | walks to a place (kitchen, fields, a person…) or stands and thinks |
+| leader | leader mode: asks you for a word, with a topic and an opening line (see Leader mode) |
 
 **When it decides.** When the current plan runs out, when someone speaks to them, when they are hurt, when danger appears,
 when important news arrives, and at least every few hours. Routine decisions are at least 22 game-minutes apart. While the
@@ -1225,6 +1238,59 @@ the changing part), replies are capped short, and thinking mode is off. At list 
 $1.2/M output; half price off-peak) a decision costs roughly $0.0002–0.0004 and a colonist makes about 40 decisions per game day:
 under a cent per colonist per game day. The AI minds window shows tokens and money spent live, lets you cap decisions per
 minute, and stops at a per-session budget (default $1). In multiplayer every player's own device runs (and pays for) their colony's minds.
+
+## Leader mode
+
+On by default whenever AI minds are on (Menu → AI minds → Leader mode to switch). **There are no work orders.** Blueprints,
+zones, bills and research still work as plans, but nothing gets built, sown, cooked or hauled until a colonist agrees to do it
+in conversation with you. Firefighting and tending the wounded are the only work people do unasked.
+
+**The talk screen.** Tap a colonist → *Talk* (inspector), or *Talk* in the Work tab's People view, or the banner when someone
+asks for you. It opens a close-up of their face over a pixel-art view of the planet (sky and light follow the time of day).
+The face is a 48×52 pixel-art bust built from their actual look and clothes, with blinking, lip-sync while they speak and
+eleven expressions: neutral, happy, excited, sad, angry, annoyed, scared, thinking, surprised, embarrassed, hurt (brows,
+eyelids, mouth shapes, blush, tears, sweat drops, anger marks). Their words type out in a dialog box in their own voice:
+a synthesized babble whose pitch, timbre, pace and wobble come from who they are (gender, age, build, traits), bent by the
+emotion of the line (excited is quick and high, sad slow and low, angry rough). Tap the box to skip ahead.
+
+**Talking back.** Default is **voice**: tap the mic, speak, and it sends when you stop (the browser's speech recognition:
+Safari on iPad/iPhone, Chrome, Edge). Tap ⌨ to type instead. Suggestion chips offer openers built from the situation
+(work waiting that nobody does and this person is good at, thanks for their duties, "how are you doing?").
+
+**Persuasion.** A request can be a one-off job or a regular duty, at any time or a time of day (morning, afternoon, evening,
+night). Whether they agree depends on their traits, backstory, skills and passions, mood and needs, how many duties they
+already carry compared to the others, the size of the ask, and their **trust** in you. Explaining why, praising, being
+fair and offering something in return help; demands, threats, insults and guilt trips make them dig in. They haggle
+("I'll do it if I get a proper bed"); agree and it becomes a recorded promise they remember. Everything agreed shows as a
+chip under the dialog (✔ Cook (regular), 🤝 You promised…, Trust +2).
+
+| Talk | How |
+| --- | --- |
+| One-on-one | Inspector → Talk, or People → Talk |
+| When they ask | A banner: "Kai has a complaint: …" with Talk / Later. 💬 on their portrait and over their head on the map. Later buys time but costs a little trust; ignoring it for half a day costs more |
+| Mediation | For a dispute, *Hear both* brings the two sides in together; or *＋ Bring in* adds anyone to a talk. Each hears the other; a line naming someone is answered by them first |
+| Address everyone | Work tab → 📣 Address everyone: the whole colony gathers and each person answers for themselves |
+
+**They come to you.** Colonists ask for a word on their own (their mind picks a topic: request, complaint, dispute, report,
+offer, feelings, quitting, warning): a bed, better food, a day off, a quarrel they can't settle, an offer to take on work
+nobody is doing. Hints on the left list work nobody has agreed to (building, farming, cooking, hauling, research).
+
+**Trust** runs from −100 to 100 (starts at 10). It rises when you listen and answer requests, praise and thank honest work
+and keep your word; it drifts down when they are miserable, overworked for their temperament, without a bed at night, or
+ignored. Words land as feelings too: *praised*, *inspired* (sometimes an inspiration), *comforted*, *thanked*, *insulted*,
+*threatened*, *dismissed*, *guilt-tripped*. Below −30 people may refuse to be drafted ("Fight them yourself!"); at −80 and
+miserable they may walk away from the colony.
+
+**Duties.** Each colonist does their duties in the order agreed, only while that duty's time of day is on. One-off jobs end
+once the work runs out. The Talk screen's *Duties* panel and the Mind tab list them with how often each was done; you can
+always release someone or move a duty up, but asking for more takes another conversation.
+
+**Under the hood.** Each participant has their own DeepSeek thread (shared rules → persona → situation → the talk so far),
+so every earlier turn stays in the prefix cache. The model answers with JSON: what they say, their emotion, work agreed or
+dropped, the trust change, how it made them feel, any promise, opinion changes about others, a note to remember, and
+whether they walk off. The result is applied as an ordinary command, so it saves and works in multiplayer. Without a key
+an offline talker reads your request, tone and reasons and answers in character. Their own autonomous mind hears about the
+talk afterwards and plans around it.
 
 ## Combat & defense
 

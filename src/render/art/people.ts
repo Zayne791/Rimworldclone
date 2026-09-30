@@ -55,10 +55,10 @@ export function lookKey(L: Look): string {
     L.mid ? c(L.mid.col) + L.mid.style : '-', L.outer ? c(L.outer.col) + L.outer.style + +L.outer.long : '-', L.head ? c(L.head.col) + L.head.style : '-', c(L.fringe), +L.shield].join('|');
 }
 
-const INK = C('#1e1a24');
+export const INK = C('#1e1a24');
 const BOOT = C('#3e2e24');
-const shade = (c: RGBA) => ({ b: c, l: ramp(c, 1.16), d: ramp(c, 0.8), dd: ramp(c, 0.64) });
-const armored = (L: Look) => !!L.outer && (L.outer.style === 'armor' || L.outer.style === 'plate');
+export const shade = (c: RGBA) => ({ b: c, l: ramp(c, 1.16), d: ramp(c, 0.8), dd: ramp(c, 0.64) });
+export const armored = (L: Look) => !!L.outer && (L.outer.style === 'armor' || L.outer.style === 'plate');
 
 /** body box with light from the upper left */
 function shadedRect(p: Pix, x: number, y: number, w: number, h: number, c: RGBA) {
@@ -157,7 +157,7 @@ const FRONT_FRAMES: Frame[] = [
   { bob: 0, lstep: 1, rstep: 0, larm: -1, rarm: 1 },
 ];
 
-function torsoColors(L: Look) {
+export function torsoColors(L: Look) {
   const base = L.outer && armored(L) ? L.outer.col : L.outer ? L.outer.col : L.mid ? L.mid.col : L.shirt || L.skin;
   return base;
 }

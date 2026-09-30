@@ -1,4 +1,6 @@
 // Player commands. Every player action goes through here (locally in single player, over the network in multiplayer).
+import { applyOutcome, lead, refusesDraft } from './leader';
+import { speak, mindEvent } from './minds';
 import { newMind, applyDecision } from './minds';
 import type { World } from './world';
 import type { Pawn, Blueprint, Building, Zone, Item } from './types';
@@ -233,14 +235,20 @@ HANDLERS.zone = (w, f, c) => {
 
 // ---------------- pawn orders ----------------
 HANDLERS.draft = (w, f, c) => {
+  const refused: string[] = [];
   for (const p of ownPawns(w, f, c.pawns)) {
     if (p.race !== 'human' || p.downed) continue;
     if (p.mental) continue;
+    if (c.on && !p.drafted) {
+      const no = refusesDraft(w, p);
+      if (no) { speak(w, p, no); mindEvent(w, p, 'The leader tried to order you into battle and you refused.'); refused.push(`${pawnShortName(p)}: "${no}"`); continue; }
+    }
     p.drafted = !!c.on;
     if (p.job) endJob(w, p, 'done');
     p.queue = [];
     if (p.carry && p.drafted) dropCarry(w, p);
   }
+  if (refused.length) return ERR(`Refused to fight: ${refused.join(' · ')}`);
 };
 HANDLERS.firewill = (w, f, c) => { for (const p of ownPawns(w, f, c.pawns)) p.fireAtWill = !!c.on; };
 
@@ -544,15 +552,68 @@ HANDLERS.p2p_respond = (w, f, c) => {
 };
 
 // ---------------- AI minds ----------------
+function leaderIntro(w: World, f: number) {
+  const pl = w.playerByFaction(f);
+  if (!pl || pl.leaderIntro || !pl.minds || pl.leader === false) return;
+  pl.leaderIntro = true;
+  w.letter(f, 'You lead. They decide.', 'Your colonists think for themselves now, and nobody takes orders. Nothing gets done unless someone agrees to do it. Talk to each of them (tap a colonist, then Talk, or open the Work tab): ask, explain, persuade, bargain. Tap the mic and speak, or type. They will come to you too, with requests, complaints and quarrels. Trust is earned, so keep your promises.', 'info');
+}
 HANDLERS.minds = (w, f, c) => {
   const pl = w.playerByFaction(f);
   if (!pl) return;
   pl.minds = !!c.on;
+  if (c.on) leaderIntro(w, f);
   for (const p of w.colonists(f)) {
     if (c.on) { if (!p.mind) p.mind = newMind(); else { p.mind.on = true; p.mind.want = p.mind.want || w.tick; p.mind.why = 'your mind is your own again'; } }
     else if (p.mind) p.mind.on = false;
   }
 };
+// ---------------- leader mode ----------------
+HANDLERS.leadermode = (w, f, c) => { const pl = w.playerByFaction(f); if (pl) { pl.leader = !!c.on; if (c.on) leaderIntro(w, f); } };
+/** a conversation turn with the leader: what they said, and what the colonist said and agreed to */
+HANDLERS.agree = (w, f, c) => {
+  const p = w.pawns.get(c.pawn);
+  if (!p || p.faction !== f || !p.mind || p.dead || !c.o || typeof c.o !== 'object') return ERR('Nobody to talk to');
+  const L = lead(p);
+  if (c.audience && L.audience) { L.audience = null; L.trust = Math.min(100, L.trust + 1); } // being heard out counts for something
+  applyOutcome(w, p, c.o, String(c.said || ''));
+};
+HANDLERS.audience = (w, f, c) => {
+  const p = w.pawns.get(c.pawn);
+  if (!p || p.faction !== f || !p.mind) return;
+  const L = lead(p);
+  if (c.op === 'later' && L.audience) { L.audience.t = w.tick; L.trust = Math.max(-100, L.trust - 1); mindEvent(w, p, 'The leader said they would talk to you later.'); return; } // "not now": resets the clock before it goes stale
+  L.audience = null;
+};
+/** a face-to-face talk opened or closed: the colonist stops what they're doing to listen */
+HANDLERS.talking = (w, f, c) => {
+  for (const id of Array.isArray(c.pawns) ? c.pawns.slice(0, 12) : []) {
+    const p = w.pawns.get(id);
+    if (!p || p.faction !== f || !p.mind || p.dead) continue;
+    const L = lead(p);
+    if (c.on) {
+      L.talking = w.tick;
+      if (p.job && !p.drafted && !p.job.forced && !['rescue', 'tend', 'flee', 'firefight'].includes(p.job.type) && !p.downed) { if (p.carry) dropCarry(w, p); endJob(w, p, 'done'); }
+      p.asleep = false;
+    } else if (L.talking) {
+      // afterwards the colonist's own mind takes stock of what was said and agreed
+      const said = L.chat.filter(l => l.t >= L.talking!).slice(-4).map(l => `${l.who === 0 ? 'Leader' : 'You'}: "${l.text.slice(0, 90)}"`);
+      L.talking = undefined;
+      if (said.length) mindEvent(w, p, `You just talked with the leader. ${said.join(' ')}`.slice(0, 160), true);
+    }
+  }
+};
+/** the leader can always release someone from a duty or change its order; asking for more needs a talk */
+HANDLERS.duty = (w, f, c) => {
+  const p = w.pawns.get(c.pawn);
+  if (!p || p.faction !== f || !p.mind) return;
+  const L = lead(p);
+  const k = L.duties.findIndex(d => d.id === c.id);
+  if (k < 0) return;
+  if (c.op === 'drop') { const [d] = L.duties.splice(k, 1); mindEvent(w, p, `The leader released you from ${d.work} duty.`); }
+  if (c.op === 'up' && k > 0) { const [d] = L.duties.splice(k, 1); L.duties.splice(k - 1, 0, d); }
+};
+
 HANDLERS.mind = (w, f, c) => {
   const p = w.pawns.get(c.pawn);
   if (!p || p.faction !== f || !p.mind?.on || p.dead) return;

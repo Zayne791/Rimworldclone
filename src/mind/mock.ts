@@ -52,9 +52,39 @@ export function mockDecide(pc: Perception): any {
     else tone = pick(['friendly', 'joke', 'deep', 'praise']);
     return { thought: pick(THOUGHTS.talk), action: 'talk', target: o.name, tone, say: pick(LINES[tone]), hours: 0.25 };
   }
-  const open = pc.work.filter(w => w.open);
-  if (!open.length) return { thought: 'Nothing to do. Nice.', action: 'relax', hours: 0.5 };
+  if (pc.leader) {
+    const ask = leaderAsk(pc, t);
+    if (ask) return ask;
+  }
+  const allowed = (id: string) => !pc.leader || pc.duties.some(d => d.work === id && d.active) || id === 'firefight' || id === 'doctor';
+  const open = pc.work.filter(w => w.open && allowed(w.id));
+  if (!open.length) return pc.leader && Math.random() < 0.5
+    ? { thought: pick(['Nobody asked me to do anything.', 'Guess I have the afternoon off.', 'I wonder what the leader has in mind.']), action: 'idle', hours: 0.6 }
+    : { thought: 'Nothing to do. Nice.', action: 'relax', hours: 0.5 };
   const score = (w: Perception['work'][number]) => (w.prio ? 5 - w.prio : 0) * 2 + Math.max(0, w.skill) * 0.5 + Math.random() * 3 + (w.id === 'firefight' || w.id === 'doctor' ? 6 : 0);
   const best = open.reduce((a, b) => (score(a) >= score(b) ? a : b));
   return { thought: pick(THOUGHTS.work), action: 'work', work: best.id, hours: lazy ? 1 : 2 + Math.random() * 2, say: '' };
+}
+
+const ASK: Record<string, string[]> = {
+  offer: ['Nobody is doing the {w}. I could take it on, if you want.', 'I am good at {w}. Want me to handle it?', 'Boss, the {w} is piling up. I can help.'],
+  complaint: ['I can not keep going like this. Something has to change.', 'Can we talk? I am not happy here.', 'I need a break, honestly.'],
+  dispute: ['I need to talk to you about {p}. It is getting bad.', '{p} is driving me up the wall. Can you do something?'],
+  feelings: ['Got a minute? I just need to talk.', 'Can I tell you something?'],
+  request: ['Any chance I could get a proper bed?', 'Could we get some decent food around here?'],
+};
+function leaderAsk(pc: Perception, t: Set<string>): any | null {
+  if (pc.asked) return null;
+  const r = Math.random();
+  const say = (k: string, fill: Record<string, string> = {}) => pick(ASK[k]).replace(/\{(\w)\}/g, (_, x) => fill[x] || '');
+  if (pc.needs.mood < 0.3 && r < 0.3) return { thought: 'I have to say something.', action: 'leader', topic: 'complaint', say: say('complaint'), hours: 0.3 };
+  const foe = pc.people.find(p => p.op < -30);
+  if (foe && r < 0.15) return { thought: `${foe.name} again. Enough.`, action: 'leader', topic: 'dispute', target: foe.name, say: say('dispute', { p: foe.name }), hours: 0.3 };
+  const idle = !pc.duties.some(d => d.active && pc.work.find(w => w.id === d.work)?.open);
+  if (idle && pc.unowned.length && r < (t.has('industrious') || t.has('hard_worker') ? 0.5 : t.has('lazy') ? 0.05 : 0.25)) {
+    const best = pc.unowned.map(id => pc.work.find(w => w.id === id)!).reduce((a, b) => (a.skill >= b.skill ? a : b));
+    return { thought: 'Might as well be useful.', action: 'leader', topic: 'offer', say: say('offer', { w: best.label.toLowerCase() }), hours: 0.3 };
+  }
+  if (r < 0.03) return { thought: 'I should talk to the leader.', action: 'leader', topic: 'feelings', say: say('feelings'), hours: 0.3 };
+  return null;
 }
