@@ -230,7 +230,8 @@ h3 { font-size: 1.05em; color: var(--accent); margin: 8px 0 4px; }
 .ccard .top { display: flex; gap: 8px; align-items: center; }
 .ccard .top img { width: 64px; height: 64px; image-rendering: pixelated; background: #120f18; border: 2px solid var(--edge); }
 .seg { display: flex; gap: 3px; flex-wrap: wrap; }
-.seg .btn { flex: 1; min-width: 80px; }
+.seg .btn { flex: 1; min-width: 80px; white-space: normal; line-height: 1.15; flex-direction: column; justify-content: center; }
+.seg .btn small { display: block; font-size: 0.78em; opacity: 0.75; }
 .field { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
 .field > label { color: var(--dim); font-size: 0.85em; }
 .sitemap { image-rendering: pixelated; width: 100%; max-width: 420px; border: 2px solid var(--edge); cursor: crosshair; touch-action: none; }

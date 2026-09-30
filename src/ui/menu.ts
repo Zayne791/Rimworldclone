@@ -155,7 +155,7 @@ function newGameScreen(mp: boolean) {
   screen(`<h2>${mp ? 'Host multiplayer' : 'New colony'}</h2><div class="card px">
     <div class="field"><label>Your name</label><input id="f-name" value="${escapeHtml(setup.name)}" maxlength="16"></div>
     <div class="field"><label>Colony name</label><input id="f-colony" value="${escapeHtml(setup.colony)}" maxlength="24"></div>
-    <div class="field"><label>Storyteller</label>${seg('teller', [['classic', 'Steady Sol — balanced'], ['chill', 'Gentle Gaia — relaxed'], ['chaos', 'Wildcard Wren — chaos']], setup.teller)}</div>
+    <div class="field"><label>Storyteller</label>${seg('teller', [['classic', 'Steady Sol<small>balanced</small>'], ['chill', 'Gentle Gaia<small>relaxed</small>'], ['chaos', 'Wildcard Wren<small>chaos</small>']], setup.teller)}</div>
     <div class="field"><label>Difficulty</label>${seg('diff', [[0, 'Peaceful'], [1, 'Easy'], [2, 'Normal'], [3, 'Hard'], [4, 'Brutal']], setup.diff)}</div>
     <div class="field"><label>Map size</label>${seg('size', mp ? [[160, 'Medium'], [200, 'Large'], [240, 'Huge']] : [[100, 'Small'], [140, 'Medium'], [180, 'Large']], setup.size)}</div>
     ${mp ? `<div class="field"><label>Max players</label>${seg('maxPlayers', [[2, '2'], [3, '3'], [4, '4']], setup.maxPlayers)}</div>
