@@ -1,0 +1,32 @@
+import type { PlantDef } from './types';
+
+// index 0 = none
+export const PLANTS: PlantDef[] = [
+  { id: 'none', label: 'none', kind: 'grass', growDays: 1, minFert: 0, sowable: false, wild: false, beauty: 0, pathCost: 0, flam: 0, nutrition: 0, hp: 1, color: '#000', sprite: 'none' },
+  // wild ground cover
+  { id: 'grass', label: 'grass', kind: 'grass', growDays: 2.5, minFert: 0.3, sowable: false, wild: true, beauty: 0, pathCost: 0, flam: 1, nutrition: 0.18, hp: 85, color: '#6f9a3c', color2: '#8fb84a', sprite: 'grass', regrow: undefined },
+  { id: 'tallgrass', label: 'tall grass', kind: 'grass', growDays: 4, minFert: 0.5, sowable: false, wild: true, beauty: 0, pathCost: 1, flam: 1, nutrition: 0.25, hp: 85, color: '#5f8a34', color2: '#9cc05a', sprite: 'tallgrass' },
+  { id: 'dandelion', label: 'dandelions', kind: 'flower', growDays: 3, minFert: 0.4, sowable: false, wild: true, beauty: 1, pathCost: 0, flam: 1, nutrition: 0.15, hp: 85, color: '#5f8a34', color2: '#f2d23c', sprite: 'flower', fruit: '#f2d23c' },
+  { id: 'bush', label: 'bush', kind: 'bush', growDays: 6, minFert: 0.4, sowable: false, wild: true, beauty: 1, pathCost: 4, cover: 0.2, flam: 1, nutrition: 0.35, hp: 120, color: '#3f6a2c', color2: '#5a8a3c', sprite: 'bush' },
+  { id: 'berry_bush', label: 'wild berry bush', kind: 'bush', growDays: 8, minFert: 0.5, sowable: false, wild: true, beauty: 1, pathCost: 4, cover: 0.2, flam: 1, nutrition: 0.4, hp: 120, harvestItem: 'berries', harvestYield: 12, harvestMin: 0.95, regrow: 0.3, color: '#3f6a2c', color2: '#5a8a3c', fruit: '#b0304a', sprite: 'berrybush' },
+  { id: 'healroot_wild', label: 'wild healroot', kind: 'bush', growDays: 12, minFert: 0.5, sowable: false, wild: true, beauty: 0, pathCost: 2, flam: 1, nutrition: 0.2, hp: 100, harvestItem: 'medicine_herbal', harvestYield: 1, harvestMin: 0.95, color: '#4e7a3e', color2: '#86b060', fruit: '#e8f0d0', sprite: 'healroot' },
+  // trees
+  { id: 'oak', label: 'oak tree', kind: 'tree', growDays: 30, minFert: 0.5, sowable: true, wild: true, beauty: 2, pathCost: 8, cover: 0.25, flam: 1, nutrition: 1.5, hp: 400, woodYield: 25, color: '#3d6a2c', color2: '#58903a', sprite: 'oak', blocksSight: false, sowSkill: 6 },
+  { id: 'poplar', label: 'poplar tree', kind: 'tree', growDays: 15, minFert: 0.5, sowable: true, wild: true, beauty: 2, pathCost: 8, cover: 0.25, flam: 1, nutrition: 1.5, hp: 300, woodYield: 20, color: '#4d7c30', color2: '#78a848', sprite: 'poplar', sowSkill: 6 },
+  { id: 'pine', label: 'pine tree', kind: 'tree', growDays: 25, minFert: 0.4, sowable: true, wild: true, beauty: 2, pathCost: 8, cover: 0.25, flam: 1, nutrition: 1.5, hp: 350, woodYield: 22, color: '#2c5a3a', color2: '#3f7a4c', sprite: 'pine', minTemp: -20, sowSkill: 6 },
+  { id: 'birch', label: 'birch tree', kind: 'tree', growDays: 20, minFert: 0.5, sowable: true, wild: true, beauty: 2, pathCost: 8, cover: 0.25, flam: 1, nutrition: 1.5, hp: 300, woodYield: 20, color: '#5c8c38', color2: '#8cbc54', sprite: 'birch', sowSkill: 6 },
+  // crops
+  { id: 'rice', label: 'rice plant', kind: 'crop', growDays: 3, minFert: 0.5, sowable: true, wild: false, beauty: 0, pathCost: 1, flam: 1, nutrition: 0.2, hp: 85, harvestItem: 'rice', harvestYield: 6, harvestMin: 1, color: '#6e9a3a', color2: '#d9c870', fruit: '#e8dca0', sprite: 'rice', sowSkill: 0, lightMin: 0.5 },
+  { id: 'potato', label: 'potato plant', kind: 'crop', growDays: 5.8, minFert: 0.3, sowable: true, wild: false, beauty: 0, pathCost: 1, flam: 1, nutrition: 0.2, hp: 85, harvestItem: 'potato', harvestYield: 11, harvestMin: 1, color: '#4f8a38', color2: '#6aa848', fruit: '#b08850', sprite: 'potato', sowSkill: 0, lightMin: 0.5 },
+  { id: 'corn', label: 'corn plant', kind: 'crop', growDays: 11.3, minFert: 0.5, sowable: true, wild: false, beauty: 0, pathCost: 2, flam: 1, nutrition: 0.3, hp: 85, harvestItem: 'corn', harvestYield: 22, harvestMin: 1, color: '#5c9a3a', color2: '#88c050', fruit: '#f0cc40', sprite: 'corn', sowSkill: 0, lightMin: 0.5 },
+  { id: 'strawberry', label: 'strawberry plant', kind: 'crop', growDays: 4.6, minFert: 0.5, sowable: true, wild: false, beauty: 1, pathCost: 1, flam: 1, nutrition: 0.2, hp: 85, harvestItem: 'strawberry', harvestYield: 7, harvestMin: 1, color: '#4c8a3c', color2: '#6aa84c', fruit: '#e03848', sprite: 'strawberry', sowSkill: 0, lightMin: 0.5 },
+  { id: 'healroot', label: 'healroot', kind: 'crop', growDays: 11, minFert: 0.5, sowable: true, wild: false, beauty: 0, pathCost: 1, flam: 1, nutrition: 0.2, hp: 85, harvestItem: 'medicine_herbal', harvestYield: 1, harvestMin: 1, color: '#4e7a3e', color2: '#86b060', fruit: '#e8f0d0', sprite: 'healroot', sowSkill: 8, research: 'medicine_production', lightMin: 0.5 },
+  { id: 'cotton', label: 'cotton plant', kind: 'crop', growDays: 8, minFert: 0.5, sowable: true, wild: false, beauty: 0, pathCost: 1, flam: 1, nutrition: 0.2, hp: 85, harvestItem: 'cloth', harvestYield: 10, harvestMin: 1, color: '#5a8a40', color2: '#78a858', fruit: '#f4f2ea', sprite: 'cotton', sowSkill: 0, lightMin: 0.5 },
+  { id: 'devilstrand_plant', label: 'devilstrand mushroom', kind: 'crop', growDays: 22, minFert: 0.5, sowable: true, wild: false, beauty: 0, pathCost: 1, flam: 1, nutrition: 0.2, hp: 85, harvestItem: 'devilstrand', harvestYield: 12, harvestMin: 1, color: '#6a2a24', color2: '#a33a30', fruit: '#c24a3c', sprite: 'devilstrand', sowSkill: 10, research: 'devilstrand', lightMin: 0 },
+  { id: 'haygrass', label: 'haygrass', kind: 'crop', growDays: 6.4, minFert: 0.5, sowable: true, wild: false, beauty: 0, pathCost: 1, flam: 1, nutrition: 0.3, hp: 85, harvestItem: 'hay', harvestYield: 18, harvestMin: 1, color: '#7ea040', color2: '#c8c068', fruit: '#d8cc78', sprite: 'haygrass', sowSkill: 0, lightMin: 0.5 },
+  { id: 'rose', label: 'rose', kind: 'flower', growDays: 4, minFert: 0.5, sowable: true, wild: false, beauty: 8, pathCost: 1, flam: 1, nutrition: 0.1, hp: 85, color: '#3f7a34', color2: '#5a9a44', fruit: '#e0405a', sprite: 'flower', sowSkill: 0, lightMin: 0.5 },
+  { id: 'daylily', label: 'daylily', kind: 'flower', growDays: 4, minFert: 0.5, sowable: true, wild: false, beauty: 8, pathCost: 1, flam: 1, nutrition: 0.1, hp: 85, color: '#4a8034', color2: '#62a044', fruit: '#f08a30', sprite: 'flower', sowSkill: 0, lightMin: 0.5 },
+];
+export const PLANT_INDEX: Record<string, number> = {};
+PLANTS.forEach((p, i) => (PLANT_INDEX[p.id] = i));
+export const CROPS = PLANTS.filter(p => p.sowable && p.kind !== 'tree').map(p => p.id);

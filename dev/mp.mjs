@@ -1,0 +1,45 @@
+import { chromium, devices } from 'playwright';
+const Q = process.argv[2] || 'peerhost=127.0.0.1&peerport=9000&peerpath=/&peersecure=false';
+const base = 'http://127.0.0.1:5173/?' + Q;
+const b = await chromium.launch({ args: ['--disable-features=WebRtcHideLocalIpsWithMdns'] });
+const errs = [];
+const mk = async (dev, tag) => { const c = await b.newContext({ ...devices[dev] }); const p = await c.newPage(); p.on('pageerror', e => errs.push(tag + ' pageerror: ' + e.message + ' ' + e.stack)); p.on('console', m => { if (m.type() === 'error') errs.push(tag + ' console: ' + m.text()); }); return p; };
+const A = await mk('iPad Pro 11', 'A');
+await A.goto(base);
+await A.waitForSelector('[data-m="host"]'); await A.tap('[data-m="host"]');
+await A.waitForSelector('[data-m="next"]'); await A.tap('[data-m="next"]');
+await A.waitForSelector('[data-m="site"]', { timeout: 30000 }); await A.tap('[data-m="site"]');
+await A.waitForSelector('[data-m="go"]'); await A.tap('[data-m="go"]');
+await A.waitForFunction(() => window.__game?.net?.roomCode, null, { timeout: 30000 });
+const code = await A.evaluate(() => window.__game.net.roomCode);
+console.log('room', code);
+const B = await mk('iPhone 13', 'B');
+await B.goto(base + '&join=' + code);
+await B.waitForSelector('[data-m="go"]'); await B.tap('[data-m="go"]');
+try { await B.waitForSelector('[data-m="site"]', { timeout: 40000 }); } catch (e) { console.log('B status:', await B.evaluate(() => document.getElementById('j-status')?.textContent)); await B.screenshot({ path: 'test-output/mp-B-fail.png' }); console.log(errs.join('\n')); process.exit(1); } await B.screenshot({ path: 'test-output/mp-B-crew.png' });
+await B.tap('[data-m="site"]');
+await B.waitForSelector('[data-m="go"]'); await B.screenshot({ path: 'test-output/mp-B-site.png' }); await B.tap('[data-m="go"]');
+await B.waitForFunction(() => window.__game && window.__game.world.colonists(window.__game.faction).length > 0, null, { timeout: 30000 });
+await B.waitForTimeout(2000);
+const info = await Promise.all([A, B].map(p => p.evaluate(() => { const g = window.__game; const w = g.world; return { mode: w.mode, faction: g.faction, tick: w.tick, players: w.players.map(p => p.name + ':' + p.faction + ':' + p.connected), pawns: w.pawns.size, cols: w.colonists(g.faction).map(p => p.name.nick), things: w.things.size }; })));
+console.log(JSON.stringify(info, null, 1));
+// B drafts its first colonist and moves it
+await B.evaluate(() => { const g = window.__game; const p = g.world.colonists(g.faction)[0]; g.cmd({ c: 'draft', pawns: [p.id], on: true }); g.cmd({ c: 'move', pawns: [p.id], x: p.x + 5, y: p.y }); });
+await B.waitForTimeout(2500);
+const chk = await A.evaluate(() => { const g = window.__game; const w = g.world; const f = w.players.find(p => !p.isHost).faction; return w.colonists(f).map(p => ({ n: p.name.nick, drafted: p.drafted, x: p.x, job: p.job?.type })); });
+console.log('host view of B colonists', JSON.stringify(chk));
+// B builds a wall; check host sees blueprint
+await B.evaluate(() => { const g = window.__game; const p = g.world.colonists(g.faction)[1]; g.cmd({ c: 'build', def: 'wall', stuff: 'wood', rot: 0, cells: [[p.x + 2, p.y - 3], [p.x + 3, p.y - 3]] }); });
+await B.waitForTimeout(1500);
+const bp = await A.evaluate(() => [...window.__game.world.blueprints.values()].filter(b => b.faction !== window.__game.faction).length);
+const bpB = await B.evaluate(() => [...window.__game.world.blueprints.values()].filter(b => b.faction === window.__game.faction).length);
+console.log('host sees B blueprints', bp, 'B sees own', bpB);
+await A.evaluate(() => window.__game.cmd({ c: 'chat', text: 'hello from host' }));
+await B.waitForTimeout(1500);
+console.log('B chat', await B.evaluate(() => JSON.stringify(window.__game.world.chat)));
+await A.screenshot({ path: 'test-output/mp-A.png' }); await B.screenshot({ path: 'test-output/mp-B.png' });
+// jump A camera to B colony
+await A.evaluate(() => { const g = window.__game; const pl = g.world.players.find(p => !p.isHost); g.jumpTo(pl.startX, pl.startY); });
+await A.waitForTimeout(800); await A.screenshot({ path: 'test-output/mp-A-seesB.png' });
+console.log(errs.slice(0, 15).join('\n'));
+await b.close();

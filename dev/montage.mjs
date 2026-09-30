@@ -1,0 +1,10 @@
+import { chromium } from 'playwright';
+import fs from 'node:fs';
+const [,, out, cols = '4', width = '1600', ...files] = process.argv;
+const imgs = files.map(f => `<figure><img src="data:image/png;base64,${fs.readFileSync(f).toString('base64')}"><figcaption>${f.split('/').pop()}</figcaption></figure>`).join('');
+const html = `<html><body style="margin:0;background:#111;color:#ccc;font:12px monospace"><div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:6px;padding:6px">${imgs}</div><style>figure{margin:0}img{width:100%;display:block}</style></body></html>`;
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: +width, height: 800 } });
+await p.setContent(html);
+await p.screenshot({ path: out, fullPage: true });
+await b.close();

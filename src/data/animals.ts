@@ -1,0 +1,31 @@
+import type { AnimalDef } from './types';
+
+export const ANIMALS: Record<string, AnimalDef> = {};
+function a(d: AnimalDef) { ANIMALS[d.id] = d; }
+
+const bite = (d: number) => ({ label: 'bite', damage: d, type: 'bite' as const, cooldown: 110 });
+const claw = (d: number) => ({ label: 'claw', damage: d, type: 'scratch' as const, cooldown: 100 });
+const head = (d: number) => ({ label: 'headbutt', damage: d, type: 'blunt' as const, cooldown: 140 });
+const kick = (d: number) => ({ label: 'kick', damage: d, type: 'blunt' as const, cooldown: 130 });
+
+a({ id: 'hare', label: 'hare', size: 0.2, hp: 30, speed: 5.5, meat: 12, wildness: 0.5, diet: 'grazer', attacks: [bite(3)], commonality: 1, sprite: 'hare', color: '#a88a66', color2: '#e8dccc', value: 40, flees: true, leather: 'leather', leatherCount: 6 });
+a({ id: 'squirrel', label: 'squirrel', size: 0.15, hp: 20, speed: 5, meat: 8, wildness: 0.6, diet: 'grazer', attacks: [bite(2)], commonality: 0.8, sprite: 'squirrel', color: '#9a5a32', color2: '#d8b090', value: 30, flees: true, leather: 'leather', leatherCount: 4 });
+a({ id: 'deer', label: 'deer', size: 1, hp: 90, speed: 5.5, meat: 70, wildness: 0.6, diet: 'grazer', herd: [1, 4], attacks: [head(8), kick(7)], commonality: 1, sprite: 'deer', color: '#9c6c40', color2: '#e8d4b8', value: 120, flees: true, manhunterChance: 0.05, leather: 'leather', leatherCount: 30 });
+a({ id: 'boar', label: 'wild boar', size: 0.9, hp: 90, speed: 4.2, meat: 60, wildness: 0.5, diet: 'omnivore', herd: [1, 3], attacks: [head(10), bite(9)], commonality: 0.8, sprite: 'boar', color: '#5c4636', color2: '#8a7058', value: 110, manhunterChance: 0.2, leather: 'leather', leatherCount: 25 });
+a({ id: 'muffalo', label: 'muffalo', size: 2.4, hp: 200, speed: 4, meat: 140, wildness: 0.3, diet: 'grazer', herd: [3, 7], attacks: [head(14), kick(10)], commonality: 0.8, sprite: 'muffalo', color: '#6a5a4a', color2: '#e0d4bc', color3: '#3a3028', value: 300, pack: true, manhunterChance: 0.05, products: [{ kind: 'wool', item: 'wool', count: 30, days: 15 }, { kind: 'milk', item: 'milk', count: 12, days: 2 }], leather: 'leather', leatherCount: 60 });
+a({ id: 'alpaca', label: 'alpaca', size: 1, hp: 80, speed: 4.3, meat: 60, wildness: 0.35, diet: 'grazer', herd: [2, 5], attacks: [kick(6)], commonality: 0.6, sprite: 'alpaca', color: '#e8dcc4', color2: '#fff8e8', value: 200, pack: true, products: [{ kind: 'wool', item: 'wool', count: 20, days: 12 }], leather: 'leather', leatherCount: 25 });
+a({ id: 'wolf', label: 'timber wolf', size: 0.85, hp: 85, speed: 5.8, meat: 50, wildness: 0.85, predator: true, diet: 'carnivore', herd: [2, 5], attacks: [bite(13), claw(7)], commonality: 0.5, sprite: 'wolf', color: '#6c6a68', color2: '#b4b0aa', value: 200, manhunterChance: 0.5, leather: 'fur', leatherCount: 20 });
+a({ id: 'cougar', label: 'cougar', size: 0.9, hp: 100, speed: 6, meat: 55, wildness: 0.9, predator: true, diet: 'carnivore', attacks: [claw(12), bite(14)], commonality: 0.3, sprite: 'cougar', color: '#b88a58', color2: '#e0c8a0', value: 250, manhunterChance: 0.6, leather: 'fur', leatherCount: 20 });
+a({ id: 'bear', label: 'grizzly bear', size: 2.2, hp: 280, speed: 4.5, meat: 140, wildness: 0.85, predator: true, diet: 'omnivore', attacks: [claw(20), bite(22)], commonality: 0.25, sprite: 'bear', color: '#5a3e2a', color2: '#7a5a40', value: 400, manhunterChance: 0.7, leather: 'fur', leatherCount: 45 });
+a({ id: 'boomalope', label: 'boomalope', size: 1.3, hp: 110, speed: 3.6, meat: 60, wildness: 0.5, diet: 'grazer', herd: [1, 2], attacks: [head(8)], commonality: 0.25, sprite: 'boomalope', color: '#b8a888', color2: '#d86030', value: 150, explodes: true, manhunterChance: 0.1, leather: 'leather', leatherCount: 20 });
+a({ id: 'thrumbo', label: 'thrumbo', size: 4, hp: 600, speed: 5.5, meat: 250, wildness: 0.98, diet: 'grazer', attacks: [head(35), kick(28)], commonality: 0, rare: true, sprite: 'thrumbo', color: '#e8e8ec', color2: '#c8c8d0', color3: '#f0e0a0', value: 4000, manhunterChance: 0.95, leather: 'fur', leatherCount: 80, armorSharp: 0.5, armorBlunt: 0.3 });
+a({ id: 'chicken', label: 'chicken', size: 0.3, hp: 30, speed: 3.5, meat: 10, wildness: 0.1, diet: 'grazer', attacks: [bite(2)], commonality: 0, domestic: true, sprite: 'chicken', color: '#f0ece0', color2: '#d8402a', value: 30, products: [{ kind: 'eggs', item: 'eggs', count: 1, days: 1 }], flees: true });
+a({ id: 'cow', label: 'cow', size: 2, hp: 160, speed: 3.8, meat: 130, wildness: 0.1, diet: 'grazer', attacks: [head(10)], commonality: 0, domestic: true, sprite: 'cow', color: '#f0ece6', color2: '#2e2a28', value: 250, products: [{ kind: 'milk', item: 'milk', count: 14, days: 1 }], leather: 'leather', leatherCount: 50 });
+a({ id: 'dog', label: 'husky', size: 0.9, hp: 90, speed: 5.5, meat: 40, wildness: 0, diet: 'carnivore', attacks: [bite(11)], commonality: 0, domestic: true, sprite: 'dog', color: '#6e6c70', color2: '#f2f0ec', value: 250, nuzzles: true, leather: 'leather', leatherCount: 15 });
+a({ id: 'cat', label: 'cat', size: 0.3, hp: 35, speed: 5, meat: 12, wildness: 0, diet: 'carnivore', attacks: [claw(4)], commonality: 0, domestic: true, sprite: 'cat', color: '#d88a3c', color2: '#f4e0c8', value: 100, nuzzles: true, leather: 'leather', leatherCount: 5 });
+// Mechanoids
+a({ id: 'scyther', label: 'scyther', size: 1, hp: 150, speed: 5.2, meat: 0, wildness: 1, diet: 'carnivore', attacks: [{ label: 'blade', damage: 20, type: 'cut', cooldown: 100 }, { label: 'blade', damage: 20, type: 'stab', cooldown: 100 }], commonality: 0, sprite: 'scyther', color: '#b8bcc4', color2: '#e04040', value: 0, mech: true, armorSharp: 0.4, armorBlunt: 0.2 });
+a({ id: 'lancer', label: 'lancer', size: 1, hp: 150, speed: 4.2, meat: 0, wildness: 1, diet: 'carnivore', attacks: [head(9)], commonality: 0, sprite: 'lancer', color: '#b8bcc4', color2: '#40a0e0', value: 0, mech: true, weapon: 'charge_lance', armorSharp: 0.4, armorBlunt: 0.2 });
+a({ id: 'centipede', label: 'centipede', size: 3, hp: 450, speed: 2, meat: 0, wildness: 1, diet: 'carnivore', attacks: [head(15)], commonality: 0, sprite: 'centipede', color: '#9ca0a8', color2: '#e0a040', value: 0, mech: true, weapon: 'heavy_blaster', armorSharp: 0.7, armorBlunt: 0.35 });
+
+export const WILD_ANIMALS = Object.values(ANIMALS).filter(a => a.commonality > 0);

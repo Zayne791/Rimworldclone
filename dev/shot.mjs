@@ -1,0 +1,10 @@
+import { chromium } from 'playwright';
+const [,, url, out, w = '820', h = '1180'] = process.argv;
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: +w, height: +h }, deviceScaleFactor: 1 });
+p.on('console', m => console.log('console:', m.text()));
+p.on('pageerror', e => console.log('pageerror:', e.message));
+await p.goto(url);
+await p.waitForFunction(() => window.done === true, null, { timeout: 60000 }).catch(e => console.log('timeout', e.message));
+await p.screenshot({ path: out });
+await b.close();
