@@ -172,6 +172,6 @@ export function addColony(w: World, s: ColonySetup): [number, number] {
     }
   }
   for (let k = 0; k < 3; k++) placeItem(w, makeItem(w, 'chunk_slag'), cx + w.rng.int(-6, 6), cy + w.rng.int(-6, 6));
-  w.letter(faction, 'Crash landing', `Your escape pods have crashed on this uncharted rimworld. ${pawns.map(p => p.name.nick || p.name.first).join(', ')} survived the landing.\n\nBuild shelter, grow food and defend yourselves. Maybe, one day, you'll build a ship to escape.\n\nTip: Open the Help (?) menu for touch controls.`, 'info', cx, cy);
+  w.letter(faction, 'Crash landing', `Your escape pods have crashed on this uncharted rimworld. ${pawns.map(p => p.name.nick || p.name.first).join(', ')} survived the landing.\n\nBuild shelter, grow food and defend yourselves. Maybe, one day, you'll build a ship to escape.\n\nTip: Menu → How to play explains the touch controls. The hints on the left suggest what to do next.`, 'info', cx, cy);
   return site;
 }

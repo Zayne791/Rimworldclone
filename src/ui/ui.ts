@@ -12,7 +12,7 @@ import { renderDrawer, drawerAction } from './drawers';
 import * as W from './windows';
 import { ITEMS } from '../data/items';
 import { countResource } from '../sim/zones';
-import { computeAlerts } from './alerts';
+import { computeAlerts, type Alert } from './alerts';
 import { TICKS_PER_DAY } from '../core/constants';
 import { pawnShortName } from '../sim/things';
 
@@ -56,7 +56,7 @@ export class UI {
   seenLetters = new Set<number>();
   letterQueue: number[] = [];
   handlers: Record<string, Handler> = {};
-  alertList: { text: string; crit: boolean; x?: number; y?: number; id?: number }[] = [];
+  alertList: Alert[] = [];
 
   constructor(g: Game) {
     this.g = g;
@@ -203,7 +203,7 @@ export class UI {
     const sig = this.alertList.map(a => a.text).join('|');
     if (this.sig.alerts === sig) return;
     this.sig.alerts = sig;
-    this.alerts.innerHTML = this.alertList.slice(0, 6).map((a, k) => `<div class="alert ${a.crit ? 'crit' : ''}" data-a="alert" data-k="${k}">${escapeHtml(a.text)}</div>`).join('');
+    this.alerts.innerHTML = this.alertList.slice(0, 6).map((a, k) => `<div class="alert ${a.crit ? 'crit' : ''}" data-a="alert" data-k="${k}">${escapeHtml(a.text)}${a.tab ? ' <b class="accent">›</b>' : ''}</div>`).join('');
   }
   checkLetters() {
     for (const l of this.g.world.letters) {
@@ -412,7 +412,14 @@ const HANDLERS: Record<string, Handler> = {
     ui.g.audio.play(on ? 'draft' : 'click');
   },
   letter: (el, ui) => { W.openLetter(ui, +el.dataset.id!); },
-  alert: (el, ui) => { const a = ui.alertList[+el.dataset.k!]; if (a?.x !== undefined) ui.g.jumpTo(a.x, a.y!); if (a?.id) ui.g.select([a.id]); },
+  alert: (el, ui) => {
+    const a = ui.alertList[+el.dataset.k!];
+    if (!a) return;
+    if (a.x !== undefined) ui.g.jumpTo(a.x, a.y!);
+    if (a.id) ui.g.select([a.id]);
+    if (a.tab) { if (a.cat) ui.drawerCat = a.cat; if (!(ui.drawer && ui.drawerTab === a.tab) && ui.modalKind !== a.tab) ui.openTab(a.tab); else if (ui.drawer) ui.renderDrawer(); }
+    ui.g.audio.play('click');
+  },
   tooldone: (el, ui) => { ui.g.setTool(null); },
   rotate: (el, ui) => { (ui.g.tool as any)?.rotate?.(); ui.sig.banner = ''; ui.renderBanner(); },
   stuff: (el, ui) => { if (ui.g.tool) { ui.g.tool.stuff = el.dataset.v; ui.sig.banner = ''; ui.renderBanner(); } },
