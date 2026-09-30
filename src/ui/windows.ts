@@ -17,6 +17,7 @@ import { jobLabel } from '../sim/jobs';
 import { saveToDb, listSaves, exportSave } from '../sim/save';
 import { TICKS_PER_DAY, GAME_NAME, VERSION } from '../core/constants';
 import { PRIORITY_LABELS } from '../sim/zones';
+import { techTreeWindow, techTreeAction } from './techtree';
 
 const closeBtn = `<button class="btn sm" data-a="closemodal">${iconImg('close', 'ico s')}</button>`;
 const tabsHtml = (ui: UI, tabs: [string, string][], cur: string) => `<div class="row wrap">${tabs.map(([id, l]) => `<button class="btn sm ${cur === id ? 'on' : ''}" data-a="w:tab" data-v="${id}">${l}</button>`).join('')}</div>`;
@@ -84,71 +85,7 @@ function workWindow(ui: UI) {
 }
 
 // ---------------- research ----------------
-function researchWindow(ui: UI) {
-  const g = ui.g, w = g.world;
-  const rs = w.research[g.faction] || { cur: null, prog: {}, done: [] };
-  const nodes = Object.values(RESEARCH);
-  const sel0 = st.rsel || rs.cur || '';
-  const maxTier = Math.max(...nodes.map(n => n.tier)), maxCol = Math.max(...nodes.map(n => n.col));
-  const cols = maxCol + 1, rows = maxTier + 1;
-  // size nodes to fit the window width (portrait iPad fits all six columns; phones scroll sideways)
-  const GX = 14, GY = 28, PAD = 8;
-  const avail = Math.min(window.innerWidth - 16, 1100) - 28;
-  const NW = Math.max(112, Math.min(168, Math.floor((avail - PAD * 2 - GX * (cols - 1)) / cols)));
-  const NH = 62;
-  const TW = PAD * 2 + cols * NW + (cols - 1) * GX, TH = PAD * 2 + rows * NH + (rows - 1) * GY;
-  const pos = (n: typeof nodes[number]) => [PAD + n.col * (NW + GX), PAD + n.tier * (NH + GY)];
-  // related to selection: its prerequisites (recursively) light up
-  const lit = new Set<string>();
-  const walk = (id: string) => { if (lit.has(id)) return; lit.add(id); for (const pr of RESEARCH[id]?.prereqs || []) walk(pr); };
-  if (sel0) walk(sel0);
-  // edges are routed through the gaps between cards (circuit-board style) so no line crosses a card
-  const kids = new Map<string, string[]>();
-  for (const n of nodes) for (const pr of n.prereqs) { if (!kids.has(pr)) kids.set(pr, []); kids.get(pr)!.push(n.id); }
-  const paths: { d: string; c: string; z: number }[] = [];
-  for (const n of nodes) n.prereqs.forEach((pr, pi) => {
-    const a = RESEARCH[pr]; if (!a) return;
-    const [ax, ay] = pos(a), [bx, by] = pos(n);
-    const sib = [...(kids.get(pr) || [])].sort((u, v) => RESEARCH[u].col - RESEARCH[v].col || RESEARCH[u].tier - RESEARCH[v].tier);
-    const k = sib.indexOf(n.id), nk = sib.length;
-    const sx = Math.round(ax + NW / 2 + Math.max(-NW / 2 + 10, Math.min(NW / 2 - 10, (k - (nk - 1) / 2) * 7)));
-    const ex = Math.round(bx + NW / 2 + (pi - (n.prereqs.length - 1) / 2) * 12);
-    const lane = (a.col - 2.5) * 2;
-    const y1 = Math.round(ay + NH + GY / 2 + lane);
-    let d: string;
-    if (n.tier === a.tier + 1) d = `M${sx} ${ay + NH}V${y1}H${ex}V${by}`;
-    else {
-      const gx = Math.round(n.col > a.col || n.col === 0 ? bx - GX / 2 : bx + NW + GX / 2) + (n.col === a.col ? 0 : Math.sign(a.col - n.col) * 2);
-      const y2 = Math.round(by - GY / 2 + lane);
-      d = `M${sx} ${ay + NH}V${y1}H${gx}V${y2}H${ex}V${by}`;
-    }
-    const done = rs.done.includes(pr);
-    const hot = lit.has(n.id) && lit.has(pr);
-    paths.push({ d, c: hot ? '#ffd24a' : done ? '#7fd67a' : '#4a4258', z: hot ? 2 : done ? 1 : 0 });
-  });
-  paths.sort((u, v) => u.z - v.z);
-  let svg = `<svg width="${TW}" height="${TH}" style="position:absolute;left:0;top:0" shape-rendering="crispEdges">`;
-  for (const pth of paths) svg += `<path d="${pth.d}" stroke="${pth.c}" stroke-width="2" fill="none"/>`;
-  svg += `</svg>`;
-  let html = `<div class="rtree" style="width:${TW}px;height:${TH}px;margin:0 auto">${svg}`;
-  for (const n of nodes) {
-    const [x, y] = pos(n);
-    const done = rs.done.includes(n.id);
-    const can = canStartResearch(w, g.faction, n.id);
-    const prog = (rs.prog[n.id] || 0) / n.cost;
-    html += `<div class="rnode ${done ? 'done' : ''} ${rs.cur === n.id ? 'cur' : ''} ${!done && !can ? 'locked' : ''} ${n.id === sel0 ? 'sel' : ''}" style="left:${x}px;top:${y}px;width:${NW}px;height:${NH}px" data-a="w:rsel" data-v="${n.id}"><b>${escapeHtml(n.label)}</b><div class="tiny dim">${done ? '✔ complete' : `${n.cost} pts${n.hiTech ? ' · hi-tech' : ''}`}</div>${!done && prog > 0 ? `<div class="bar"><i style="width:${Math.round(prog * 100)}%"></i></div>` : ''}</div>`;
-  }
-  html += `</div>`;
-  const sel = st.rsel ? RESEARCH[st.rsel] : rs.cur ? RESEARCH[rs.cur] : null;
-  let foot = '';
-  if (sel) {
-    const done = rs.done.includes(sel.id);
-    const unlocks = Object.values(BUILDINGS).filter(b => b.research === sel.id).map(b => b.label).concat(Object.values(RECIPES).filter(r => r.research === sel.id).map(r => r.label));
-    foot = `<div class="grow"><b>${escapeHtml(sel.label)}</b> <span class="dim small">${Math.round(rs.prog[sel.id] || 0)}/${sel.cost}</span><div class="small">${escapeHtml(sel.desc)}</div>${unlocks.length ? `<div class="tiny dim">Unlocks: ${escapeHtml(unlocks.slice(0, 8).join(', '))}</div>` : ''}${sel.prereqs.length ? `<div class="tiny dim">Requires: ${sel.prereqs.map(p => RESEARCH[p].label).join(', ')}</div>` : ''}</div>
-      ${done ? '<span class="good">Done</span>' : rs.cur === sel.id ? `<button class="btn" data-a="w:rstop">Stop</button>` : `<button class="btn good ${canStartResearch(w, g.faction, sel.id) ? '' : 'dis'}" data-a="w:rstart" data-v="${sel.id}">Research</button>`}`;
-  } else foot = `<div class="dim small grow">Tap a project. Build a research bench and colonists with Research work will study it.</div>`;
-  ui.showModal('research', `<div class="wh"><h2>Research</h2>${closeBtn}</div><div class="wb" style="overflow:auto;touch-action:pan-x pan-y">${html}</div><div class="wf" style="justify-content:flex-start;align-items:center">${foot}</div>`, 'wide');
-}
+function researchWindow(ui: UI) { techTreeWindow(ui); }
 
 // ---------------- colony ----------------
 function colonyWindow(ui: UI) {
@@ -383,6 +320,7 @@ export function windowAction(ui: UI, a: string, el: HTMLElement) {
   const g = ui.g, w = g.world;
   const d = el.dataset;
   g.audio.play('click');
+  if (a.startsWith('tt') && techTreeAction(ui, a, d)) return;
   const again = () => renderWindow(ui, ui.modalKind);
   switch (a) {
     case 'tab': st.tab = d.v!; again(); break;
@@ -396,9 +334,6 @@ export function windowAction(ui: UI, a: string, el: HTMLElement) {
     case 'paint': st.paint = d.v; again(); break;
     case 'sched': g.cmd({ c: 'schedule', pawn: +d.p!, hour: +d.h!, val: st.paint || 'W' }); setTimeout(again, 50); break;
     case 'schedall': { const p = w.pawns.get(+d.p!); if (p) for (const o of w.colonists(g.faction)) g.cmd({ c: 'schedule', pawn: o.id, all: p.schedule }); setTimeout(again, 60); break; }
-    case 'rsel': st.rsel = d.v; again(); break;
-    case 'rstart': g.cmd({ c: 'research', id: d.v }); setTimeout(again, 60); break;
-    case 'rstop': g.cmd({ c: 'research', id: null }); setTimeout(again, 60); break;
     case 'jump': { const p = w.pawns.get(+d.id!); if (p) { g.select([p.id]); g.jumpTo(p.x, p.y); ui.closeModal(); } break; }
     case 'jumpcolony': { const pl = w.playerByFaction(+d.v!); if (pl?.startX !== undefined) { g.jumpTo(pl.startX, pl.startY!); ui.closeModal(); } break; }
     case 'diplo': g.cmd({ c: 'diplo', target: +d.v!, op: d.op }); setTimeout(again, 80); break;

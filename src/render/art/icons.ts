@@ -53,6 +53,10 @@ const ICONS: Record<string, string[]> = {
   check: ['................', '................', '.............kk.', '............klk.', '...........kllk.', '..kk......kllk..', '.kllk....kllk...', '..kllk..kllk....', '...kllkkllk.....', '....kllllk......', '.....kllk.......', '......kk........'],
   select: ['................', '.kk.kk.kk.kk....', '.k..........k...', '................', '.k....kk....k...', '......kwk.......', '.k....kwwk..k...', '......kwwwk.....', '.k....kwwwwk....', '......kwwkkk....', '.kk.kk.kkwk.k...', '........kk......'],
   priority: ['................', '.......kk.......', '......kyyk......', '.....kyyyyk.....', '....kyyyyyyk....', '...kkkkyykkkk...', '......kyyk......', '......kyyk......', '......kyyk......', '......kkkk......'],
+  power: ['................', '.........kk.....', '........kyk.....', '.......kyyk.....', '......kyyk......', '.....kyyykkkk...', '....kyyyyyyyk...', '...kkkkyyyyk....', '......kyyyk.....', '......kyyk......', '.....kyyk.......', '.....kyk........', '.....kk.........'],
+  medical: ['................', '.....kkkkkk.....', '.....kwwwwk.....', '.....kwrrwk.....', '..kkkkwrrwkkkk..', '..kwwwwrrwwwwk..', '..kwrrrrrrrrwk..', '..kwrrrrrrrrwk..', '..kwwwwrrwwwwk..', '..kkkkwrrwkkkk..', '.....kwrrwk.....', '.....kwwwwk.....', '.....kkkkkk.....'],
+  ship: ['................', '.......kk.......', '......kwwk......', '.....kwbbwk.....', '.....kwbbwk.....', '.....kwwwwk.....', '.....kwggwk.....', '....kkwggwkk....', '...krkwggwkrk...', '...krkkkkkkrk...', '...kk.kook.kk...', '......kook......', '.......kk.......'],
+  star: ['................', '.......kk.......', '.......kyk......', '......kyyk......', '.kkkkkkyyykkkkk.', '..kyyyyyyyyyyk..', '...kyyyyyyyyk...', '....kyyyyyyk....', '....kyyyyyyk....', '...kyyykkyyyk...', '...kyykk.kyyk...', '...kkk....kkk...'],
   wall: ['................', 'kkkkkkkkkkkkkkkk', 'kggggkggggkggggk', 'kkkkkkkkkkkkkkkk', 'kggkggggkggggkgk', 'kkkkkkkkkkkkkkkk', 'kggggkggggkggggk', 'kkkkkkkkkkkkkkkk', 'kddkddddkddddkdk', 'kkkkkkkkkkkkkkkk'],
 };
 

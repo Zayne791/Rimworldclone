@@ -119,7 +119,7 @@ function pawnInsp(ui: UI, p: Pawn): InspResult {
     if (wp) body += `<div class="small dim">${wp.melee ? 'Melee' : `Range ${wp.range}`} · dmg ${wp.damage}${wp.burst ? ' ×' + wp.burst : ''} · AP ${pct(wp.pen)}</div>`;
     body += `<h3>Apparel</h3>` + (p.apparel.length ? p.apparel.map(a => `<div class="row"><img class="ico" src="${itemIconURL(a.def, a.stuff)}"><span class="grow">${escapeHtml(itemLabel(a))} <span class="dim small">${Math.round(a.hp)} hp</span></span>${own ? `<button class="btn sm" data-a="insp:dropa" data-id="${a.id}">Drop</button>` : ''}</div>`).join('') : '<div class="bad">Naked!</div>');
     const [lo, hi] = comfyTemp(p);
-    body += `<div class="kv small" style="margin-top:6px"><span>Comfortable</span><span>${Math.round(lo)}°C to ${Math.round(hi)}°C</span><span>Armor (sharp)</span><span>${pct(armorFor(p, 'torso', 'sharp'))}</span><span>Armor (blunt)</span><span>${pct(armorFor(p, 'torso', 'blunt'))}</span></div>`;
+    body += `<div class="kv small" style="margin-top:6px"><span>Comfortable</span><span>${Math.round(lo)}°C to ${Math.round(hi)}°C</span><span>Armor (sharp)</span><span>${pct(armorFor(p, 'torso', 'sharp'))}</span><span>Armor (blunt)</span><span>${pct(armorFor(p, 'torso', 'blunt'))}</span>${(() => { const belt = p.apparel.find(a => ITEMS[a.def].apparel?.shield); if (!belt) return ''; const max = ITEMS[belt.def].apparel!.shield!; const e = p.shield ?? max; return `<span>Shield</span><span class="${(p.shieldT || 0) > w.tick ? 'bad' : 'good'}">${(p.shieldT || 0) > w.tick ? 'recharging' : `${Math.round(e)} / ${max}`}</span>`; })()}</div>`;
     if (p.carry) body += `<h3>Carrying</h3><div class="row"><img class="ico" src="${itemIconURL(p.carry.def, p.carry.stuff)}">${escapeHtml(itemLabel(p.carry))}</div>`;
   } else if (tab === 'bio') {
     if (p.story) {
@@ -200,6 +200,14 @@ function buildingInsp(ui: UI, b: Building): InspResult {
   if (d.bed) body += `<span>Owner${d.bed.sleepers > 1 ? 's' : ''}</span><span>${(b.owners || []).map(id => w.pawns.get(id)).filter(Boolean).map(p => escapeHtml(pawnShortName(p!))).join(', ') || 'none'}</span>${b.medical || d.bed.medical ? '<span>Medical</span><span class="good">yes</span>' : ''}${b.prison ? '<span>For prisoners</span><span class="warn">yes</span>' : ''}`;
   if (d.art && b.artName) body += `<span>Title</span><span class="accent">${escapeHtml(b.artName)}</span>`;
   if (d.storage) body += `<span>Priority</span><span>${PRIORITY_LABELS[b.priority || 3]}</span>`;
+  if (d.producer) {
+    const pd = d.producer;
+    const why = pd.power && !b.powered ? 'needs power' : pd.outdoors && w.map.roof[w.map.idx(b.x, b.y)] ? 'needs open sky' : pd.minTemp !== undefined && (roomAt(w, b.x, b.y)?.outdoors === false ? roomAt(w, b.x, b.y)!.temp : w.outdoorTemp) < pd.minTemp ? `too cold (needs ${pd.minTemp}°C)` : '';
+    body += `<span>Next batch</span><span class="${why ? 'warn' : ''}">${Math.round((b.prog || 0) * 100)}%${why ? ' · ' + why : ''}</span>`;
+  }
+  if (d.aura?.kind === 'firefoam') body += `<span>Status</span><span class="${(b.cd || 0) > w.tick ? 'warn' : 'good'}">${(b.cd || 0) > w.tick ? `recharging (${(((b.cd || 0) - w.tick) / 2500).toFixed(1)} h)` : 'armed'}</span>`;
+  if (d.aura?.kind === 'scan') body += `<span>Next cargo</span><span>${Math.round((b.prog || 0) * 100)}%</span>`;
+  if (d.trap) body += `<span>Armed</span><span>${b.armed ? 'yes' : 'no'}</span>`;
   const room = roomAt(w, b.x + (d.interact ? 0 : 0), b.y);
   const pl = w.playerByFaction(b.faction);
   if (!own) body += `<span>Owner</span><span>${pl ? escapeHtml(pl.colonyName) : b.faction === 0 ? 'nobody' : escapeHtml(w.faction(b.faction)?.name || '')}</span>`;

@@ -17,7 +17,7 @@ import { addSprite, Pix } from '../render/pixel';
 const CATS: [ArchCat, string][] = [['structure', 'Structure'], ['furniture', 'Furniture'], ['production', 'Production'], ['floors', 'Floors'], ['power', 'Power'], ['temperature', 'Temp'], ['lighting', 'Lights'], ['security', 'Security'], ['joy', 'Joy'], ['art', 'Art'], ['misc', 'Misc'], ['ship', 'Ship']];
 
 const floorIcon = new Map<string, string>();
-function floorURL(id: string): string {
+export function floorURL(id: string): string {
   let u = floorIcon.get(id);
   if (u) return u;
   const ti = TERRAIN.findIndex(t => t.id === id);

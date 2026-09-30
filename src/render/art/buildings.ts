@@ -408,12 +408,16 @@ def('firefoam_popper', (p, W, H, st, k, s) => {
 def('turret_autocannon', (p) => { p.ellipse(16, 20, 13, 9, DARKMETAL); p.ellipse(16, 18, 11, 7.5, C('#6a7580')); p.ellipse(16, 17, 7, 5, METAL); for (let a = 0; a < 6; a++) { const ang = a / 6 * Math.PI * 2; p.set(16 + Math.cos(ang) * 9, 18 + Math.sin(ang) * 6, C('#c8a040')); } });
 def('turret_sniper', (p) => { box(p, 4, 8, 24, 22, 4, C('#5a6068')); p.ellipse(16, 16, 9, 6, C('#7a8590')); p.rect(6, 26, 20, 2, C('#4a8a4a')); for (let x = 7; x < 25; x += 4) p.set(x, 26, C('#9fe09a')); });
 def('harp', (p, W, H, st) => {
-  p.rect(3, 13, 10, 2, ramp(st, 0.7));
-  p.line(3, 13, 3, -4, ramp(st, 0.9)); p.line(4, 13, 4, -4, st);
-  p.line(4, -4, 13, 2, st); p.line(4, -5, 13, 1, ramp(st, 1.15)); p.line(13, 2, 11, 13, st);
-  for (let x = 5; x < 12; x += 1) p.line(x, -3 + (x - 4) * 0.66, x, 12, [230, 220, 190, 180]);
-  p.set(4, -6, C('#e8c050'));
-}, 7);
+  const gold = C('#e0b040'), str: RGBA = [240, 230, 200, 220];
+  p.rect(2, 13, 12, 2, ramp(st, 0.7)); p.hline(2, 13, 13, ramp(st, 0.95));
+  // curved neck across the top, pillar on the left, soundboard sloping down to the right
+  const neck = (x: number) => Math.round(-6 + Math.pow((x - 3) / 10, 2) * 5 - Math.sin((x - 3) / 10 * Math.PI) * 2.5);
+  for (let x = 3; x <= 13; x++) { p.set(x, neck(x), st); p.set(x, neck(x) + 1, ramp(st, 0.75)); }
+  p.vline(2, -6, 13, ramp(st, 1.15)); p.vline(3, -5, 13, st); p.set(2, -7, gold); p.set(3, -7, gold);
+  for (let y = -1; y <= 13; y++) { const x = Math.round(13 - (y + 1) * 0.2); p.set(x, y, ramp(st, 0.8)); p.set(x + 1, y, ramp(st, 0.6)); }
+  for (let x = 5; x <= 11; x += 2) { const y0 = neck(x) + 2, x1 = Math.round(13 - 0.2 * 14); p.line(x, y0, Math.min(x, x1), 12, str); }
+  p.set(12, 12, gold);
+}, 8);
 def('piano', (p, W, H, st, k) => {
   box(p, 0, -2, W, 17, 5, ramp(st, 0.55)); texture(p, 0, -2, W, 10, k, ramp(st, 0.55));
   p.rect(2, 7, W - 4, 3, C('#f4f0e6'));
